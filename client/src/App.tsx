@@ -1,35 +1,45 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import Home from "./pages/Home";
+
+function HomeRoute() {
+  return (
+    <main className="min-h-screen bg-background text-foreground">
+      <div className="container flex min-h-screen items-center justify-center py-16">
+        <div className="w-full max-w-3xl rounded-3xl border border-border bg-card px-8 py-12 text-center shadow-sm">
+          <p className="text-sm font-medium uppercase tracking-[0.24em] text-muted-foreground">
+            RelGraph Starter Template
+          </p>
+          <h1 className="mt-4 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
+            RelGraph
+          </h1>
+          <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
+            Relationship Intelligence Platform starter scaffold built with React 19, Vite 7,
+            TypeScript, Tailwind CSS 4, Wouter, Express, Drizzle, and Manus runtime integration.
+          </p>
+        </div>
+      </div>
+    </main>
+  );
+}
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
-      <Route component={NotFound} />
+      <Route path="/" component={HomeRoute} />
+      <Route>
+        <HomeRoute />
+      </Route>
     </Switch>
   );
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
-function App() {
+export default function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
+      <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
           <Router />
@@ -38,5 +48,3 @@ function App() {
     </ErrorBoundary>
   );
 }
-
-export default App;
