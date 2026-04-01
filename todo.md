@@ -21,3 +21,4 @@
 - [x] Add an allowlist-aware registration page so approved users can create their own password
 - [x] Add a first-time password setup path for approved users, including the super admin account gautham@manipalgroup.info
 - [x] Update the login page UX to make sign-in, registration, and first-time setup options clear
+- [x] Fix the first-time password setup failure caused by a database schema/query mismatch during super-admin onboarding

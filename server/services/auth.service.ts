@@ -1,6 +1,6 @@
 import bcrypt from "bcrypt";
 import { SignJWT, jwtVerify } from "jose";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "../db";
 import { users } from "../db/schema";
 import type { User } from "../db/schema";
@@ -36,21 +36,96 @@ function deriveDisplayNameFromEmail(email: string): string {
   return label || "Pending User";
 }
 
+function normalizeStoredRole(role?: string | null): UserRole {
+  if (!role) return "viewer";
+  if (role === "user") return "viewer";
+  if (role in ROLE_LEVELS) return role as UserRole;
+  return "viewer";
+}
+
+let ensureUsersAuthColumnsPromise: Promise<void> | null = null;
+
+async function ensureUsersAuthCompatibility(): Promise<void> {
+  if (!ensureUsersAuthColumnsPromise) {
+    ensureUsersAuthColumnsPromise = (async () => {
+      const db = getDb();
+      const result = await db.execute(sql`
+        select column_name
+        from information_schema.columns
+        where table_schema = 'public' and table_name = 'users'
+      `);
+
+      const rows = (result as { rows?: Array<{ column_name?: string | null }> }).rows ?? [];
+      const columns = new Set(rows.map((row) => row.column_name).filter(Boolean) as string[]);
+
+      if (columns.size === 0) {
+        return;
+      }
+
+      const statements: string[] = [
+        `alter table users add column if not exists password_hash text`,
+        `alter table users add column if not exists avatar_url text`,
+        `alter table users add column if not exists is_active boolean not null default true`,
+        `alter table users add column if not exists last_active_at timestamp`,
+        `alter table users add column if not exists open_id varchar(64)`,
+        `alter table users add column if not exists login_method varchar(64)`,
+        `alter table users add column if not exists invited_by uuid`,
+        `alter table users add column if not exists created_at timestamp not null default now()`,
+        `alter table users add column if not exists updated_at timestamp not null default now()`,
+      ];
+
+      if (columns.has("openId")) {
+        statements.push(`alter table users alter column "openId" drop not null`);
+        statements.push(`update users set open_id = "openId" where open_id is null and "openId" is not null`);
+      }
+      if (columns.has("loginMethod")) {
+        statements.push(`update users set login_method = "loginMethod" where login_method is null and "loginMethod" is not null`);
+      }
+      if (columns.has("createdAt")) {
+        statements.push(`update users set created_at = "createdAt" where created_at is null and "createdAt" is not null`);
+      }
+      if (columns.has("updatedAt")) {
+        statements.push(`update users set updated_at = "updatedAt" where updated_at is null and "updatedAt" is not null`);
+      }
+      if (columns.has("lastSignedIn")) {
+        statements.push(`update users set last_active_at = "lastSignedIn" where last_active_at is null and "lastSignedIn" is not null`);
+      }
+
+      statements.push(`update users set is_active = true where is_active is null`);
+      statements.push(`alter table users alter column role type text using role::text`);
+      statements.push(`update users set role = 'viewer' where role = 'user'`);
+      statements.push(`update users set role = 'super_admin' where lower(email) = '${RESERVED_SUPER_ADMIN_EMAIL}'`);
+
+      for (const statement of statements) {
+        await db.execute(sql.raw(statement));
+      }
+    })().catch((error) => {
+      ensureUsersAuthColumnsPromise = null;
+      throw error;
+    });
+  }
+
+  await ensureUsersAuthColumnsPromise;
+}
+
 export function resolveManagedRole(email: string, requestedRole?: string | null): UserRole {
   if (isReservedSuperAdminEmail(email)) {
     return "super_admin";
   }
 
-  if (requestedRole && requestedRole in ROLE_LEVELS) {
-    return requestedRole as UserRole;
-  }
-
-  return "viewer";
+  return normalizeStoredRole(requestedRole);
 }
 
 async function syncReservedRole(user: User): Promise<User> {
-  if (!isReservedSuperAdminEmail(user.email) || user.role === "super_admin") {
-    return user;
+  await ensureUsersAuthCompatibility();
+
+  const normalizedRole = normalizeStoredRole(user.role);
+  if (!isReservedSuperAdminEmail(user.email)) {
+    return normalizedRole === user.role ? user : { ...user, role: normalizedRole };
+  }
+
+  if (normalizedRole === "super_admin") {
+    return normalizedRole === user.role ? user : { ...user, role: normalizedRole };
   }
 
   const db = getDb();
@@ -125,6 +200,8 @@ export async function verifyRefreshToken(token: string): Promise<JwtPayload | nu
 }
 
 export async function loginUser(email: string, password: string): Promise<{ user: User; accessToken: string; refreshToken: string } | null> {
+  await ensureUsersAuthCompatibility();
+
   const db = getDb();
   const normalizedEmail = normalizeEmail(email);
   const [foundUser] = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
@@ -155,24 +232,32 @@ export async function loginUser(email: string, password: string): Promise<{ user
 }
 
 export async function getUserById(id: string): Promise<User | null> {
+  await ensureUsersAuthCompatibility();
+
   const db = getDb();
   const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
   return user ? syncReservedRole(user) : null;
 }
 
 export async function getUserByEmail(email: string): Promise<User | null> {
+  await ensureUsersAuthCompatibility();
+
   const db = getDb();
   const [user] = await db.select().from(users).where(eq(users.email, normalizeEmail(email))).limit(1);
   return user ? syncReservedRole(user) : null;
 }
 
 export async function getUserByOpenId(openId: string): Promise<User | null> {
+  await ensureUsersAuthCompatibility();
+
   const db = getDb();
   const [user] = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
   return user ? syncReservedRole(user) : null;
 }
 
 export async function getPendingRegistrationByEmail(email: string): Promise<User | null> {
+  await ensureUsersAuthCompatibility();
+
   const db = getDb();
   const [user] = await db
     .select()
@@ -189,6 +274,8 @@ export async function getPendingRegistrationByEmail(email: string): Promise<User
 }
 
 export async function getAccessRequestByEmail(email: string): Promise<User | null> {
+  await ensureUsersAuthCompatibility();
+
   const db = getDb();
   const [user] = await db
     .select()
@@ -223,6 +310,8 @@ export async function createUser(data: {
   invitedBy?: string;
   isActive?: boolean;
 }): Promise<User> {
+  await ensureUsersAuthCompatibility();
+
   const db = getDb();
   const normalizedEmail = normalizeEmail(data.email);
   const passwordHash = data.password ? await hashPassword(data.password) : null;
@@ -242,6 +331,10 @@ export async function createUser(data: {
     .returning();
 
   return syncReservedRole(user);
+}
+
+export async function ensureAuthStorageReady(): Promise<void> {
+  await ensureUsersAuthCompatibility();
 }
 
 export { ACCESS_REQUEST_LOGIN_METHOD, PENDING_ALLOWLIST_LOGIN_METHOD, RESERVED_SUPER_ADMIN_EMAIL };
