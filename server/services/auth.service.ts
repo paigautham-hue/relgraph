@@ -1,9 +1,6 @@
 import bcrypt from "bcrypt";
 import { SignJWT, jwtVerify } from "jose";
-import { and, eq, sql } from "drizzle-orm";
-import { getDb } from "../db";
-import { users } from "../db/schema";
-import type { User } from "../db/schema";
+import mysql, { type Pool, type ResultSetHeader, type RowDataPacket } from "mysql2/promise";
 import type { UserRole } from "../../shared/enums";
 import { ROLE_LEVELS } from "../../shared/enums";
 
@@ -13,6 +10,83 @@ const PENDING_ALLOWLIST_LOGIN_METHOD = "allowlist_pending";
 const ACCESS_REQUEST_LOGIN_METHOD = "access_request";
 
 const getSecret = (key: string) => new TextEncoder().encode(key);
+
+export interface AuthUser {
+  id: string;
+  openId: string | null;
+  email: string;
+  name: string;
+  loginMethod: string | null;
+  role: UserRole;
+  avatarUrl: string | null;
+  domainAccess: string[];
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  lastSignedIn: Date | null;
+  lastActiveAt: Date | null;
+  passwordHash: string | null;
+  invitedBy: string | null;
+}
+
+type UserRow = RowDataPacket & {
+  id: number | string;
+  openId?: string | null;
+  email?: string | null;
+  name?: string | null;
+  loginMethod?: string | null;
+  role?: string | null;
+  passwordHash?: string | null;
+  avatarUrl?: string | null;
+  isActive?: number | boolean | null;
+  createdAt?: Date | string | null;
+  updatedAt?: Date | string | null;
+  lastSignedIn?: Date | string | null;
+  lastActiveAt?: Date | string | null;
+  invitedBy?: string | null;
+};
+
+type ColumnRow = RowDataPacket & {
+  columnName: string;
+  isNullable: "YES" | "NO";
+  columnType: string;
+};
+
+let pool: Pool | null = null;
+let ensureUsersAuthColumnsPromise: Promise<void> | null = null;
+
+function getPool(): Pool {
+  if (!pool) {
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+      throw new Error("DATABASE_URL is not configured");
+    }
+
+    pool = mysql.createPool(connectionString);
+  }
+
+  return pool;
+}
+
+async function queryRows<T extends RowDataPacket>(statement: string, params: any[] = []): Promise<T[]> {
+  const [rows] = await getPool().query(statement, params as any);
+  return rows as T[];
+}
+
+async function executeStatement(statement: string, params: any[] = []): Promise<void> {
+  await getPool().query(statement, params as any);
+}
+
+function asDate(value?: Date | string | null): Date | null {
+  if (!value) return null;
+  return value instanceof Date ? value : new Date(value);
+}
+
+function asBoolean(value?: number | boolean | null): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  return value == null ? true : Boolean(value);
+}
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -43,62 +117,88 @@ function normalizeStoredRole(role?: string | null): UserRole {
   return "viewer";
 }
 
-let ensureUsersAuthColumnsPromise: Promise<void> | null = null;
+function mapUserRow(row: UserRow): AuthUser {
+  const normalizedRole = normalizeStoredRole(row.role);
+  const email = row.email ? normalizeEmail(row.email) : (row.openId ? `${row.openId}@manus.local` : "");
+  const name = row.name?.trim() || deriveDisplayNameFromEmail(email || "pending.user");
+
+  return {
+    id: String(row.id),
+    openId: row.openId ?? null,
+    email,
+    name,
+    loginMethod: row.loginMethod ?? null,
+    role: isReservedSuperAdminEmail(email) ? "super_admin" : normalizedRole,
+    avatarUrl: row.avatarUrl ?? null,
+    domainAccess: [],
+    isActive: asBoolean(row.isActive),
+    createdAt: asDate(row.createdAt) ?? new Date(),
+    updatedAt: asDate(row.updatedAt) ?? new Date(),
+    lastSignedIn: asDate(row.lastSignedIn),
+    lastActiveAt: asDate(row.lastActiveAt),
+    passwordHash: row.passwordHash ?? null,
+    invitedBy: row.invitedBy ?? null,
+  };
+}
+
+async function loadUsersColumns(): Promise<Map<string, ColumnRow>> {
+  const rows = await queryRows<ColumnRow>(
+    `
+      select
+        COLUMN_NAME as columnName,
+        IS_NULLABLE as isNullable,
+        COLUMN_TYPE as columnType
+      from information_schema.columns
+      where table_schema = database() and table_name = 'users'
+    `,
+  );
+
+  return new Map(rows.map((row) => [row.columnName, row]));
+}
 
 async function ensureUsersAuthCompatibility(): Promise<void> {
   if (!ensureUsersAuthColumnsPromise) {
     ensureUsersAuthColumnsPromise = (async () => {
-      const db = getDb();
-      const result = await db.execute(sql`
-        select column_name
-        from information_schema.columns
-        where table_schema = 'public' and table_name = 'users'
-      `);
-
-      const rows = (result as { rows?: Array<{ column_name?: string | null }> }).rows ?? [];
-      const columns = new Set(rows.map((row) => row.column_name).filter(Boolean) as string[]);
-
+      const columns = await loadUsersColumns();
       if (columns.size === 0) {
         return;
       }
 
-      const statements: string[] = [
-        `alter table users add column if not exists password_hash text`,
-        `alter table users add column if not exists avatar_url text`,
-        `alter table users add column if not exists is_active boolean not null default true`,
-        `alter table users add column if not exists last_active_at timestamp`,
-        `alter table users add column if not exists open_id varchar(64)`,
-        `alter table users add column if not exists login_method varchar(64)`,
-        `alter table users add column if not exists invited_by uuid`,
-        `alter table users add column if not exists created_at timestamp not null default now()`,
-        `alter table users add column if not exists updated_at timestamp not null default now()`,
-      ];
+      const statements: string[] = [];
 
-      if (columns.has("openId")) {
-        statements.push(`alter table users alter column "openId" drop not null`);
-        statements.push(`update users set open_id = "openId" where open_id is null and "openId" is not null`);
+      if (!columns.has("passwordHash")) {
+        statements.push("alter table users add column passwordHash text null");
       }
-      if (columns.has("loginMethod")) {
-        statements.push(`update users set login_method = "loginMethod" where login_method is null and "loginMethod" is not null`);
+      if (!columns.has("avatarUrl")) {
+        statements.push("alter table users add column avatarUrl text null");
       }
-      if (columns.has("createdAt")) {
-        statements.push(`update users set created_at = "createdAt" where created_at is null and "createdAt" is not null`);
+      if (!columns.has("isActive")) {
+        statements.push("alter table users add column isActive boolean not null default true");
       }
-      if (columns.has("updatedAt")) {
-        statements.push(`update users set updated_at = "updatedAt" where updated_at is null and "updatedAt" is not null`);
+      if (!columns.has("lastActiveAt")) {
+        statements.push("alter table users add column lastActiveAt timestamp null");
       }
-      if (columns.has("lastSignedIn")) {
-        statements.push(`update users set last_active_at = "lastSignedIn" where last_active_at is null and "lastSignedIn" is not null`);
+      if (!columns.has("invitedBy")) {
+        statements.push("alter table users add column invitedBy varchar(191) null");
       }
 
-      statements.push(`update users set is_active = true where is_active is null`);
-      statements.push(`alter table users alter column role type text using role::text`);
-      statements.push(`update users set role = 'viewer' where role = 'user'`);
-      statements.push(`update users set role = 'super_admin' where lower(email) = '${RESERVED_SUPER_ADMIN_EMAIL}'`);
+      const openIdColumn = columns.get("openId");
+      if (openIdColumn && openIdColumn.isNullable === "NO") {
+        statements.push("alter table users modify column openId varchar(64) null");
+      }
+
+      const roleColumn = columns.get("role");
+      if (roleColumn && roleColumn.columnType.startsWith("enum(")) {
+        statements.push("alter table users modify column role varchar(32) not null default 'viewer'");
+      }
 
       for (const statement of statements) {
-        await db.execute(sql.raw(statement));
+        await executeStatement(statement);
       }
+
+      await executeStatement("update users set isActive = true where isActive is null");
+      await executeStatement("update users set role = 'viewer' where role = 'user'");
+      await executeStatement("update users set role = 'super_admin' where lower(email) = ?", [RESERVED_SUPER_ADMIN_EMAIL]);
     })().catch((error) => {
       ensureUsersAuthColumnsPromise = null;
       throw error;
@@ -116,26 +216,20 @@ export function resolveManagedRole(email: string, requestedRole?: string | null)
   return normalizeStoredRole(requestedRole);
 }
 
-async function syncReservedRole(user: User): Promise<User> {
+async function syncReservedRole(user: AuthUser): Promise<AuthUser> {
+  if (!isReservedSuperAdminEmail(user.email) || user.role === "super_admin") {
+    return user;
+  }
+
+  await executeStatement("update users set role = 'super_admin', updatedAt = ? where id = ?", [new Date(), user.id]);
+  return { ...user, role: "super_admin", updatedAt: new Date() };
+}
+
+async function selectOneBy(statement: string, params: unknown[]): Promise<AuthUser | null> {
   await ensureUsersAuthCompatibility();
-
-  const normalizedRole = normalizeStoredRole(user.role);
-  if (!isReservedSuperAdminEmail(user.email)) {
-    return normalizedRole === user.role ? user : { ...user, role: normalizedRole };
-  }
-
-  if (normalizedRole === "super_admin") {
-    return normalizedRole === user.role ? user : { ...user, role: normalizedRole };
-  }
-
-  const db = getDb();
-  const [updated] = await db
-    .update(users)
-    .set({ role: "super_admin", updatedAt: new Date() })
-    .where(eq(users.id, user.id))
-    .returning();
-
-  return updated ?? { ...user, role: "super_admin" };
+  const rows = await queryRows<UserRow>(statement, params);
+  if (rows.length === 0) return null;
+  return syncReservedRole(mapUserRow(rows[0]));
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -199,28 +293,25 @@ export async function verifyRefreshToken(token: string): Promise<JwtPayload | nu
   }
 }
 
-export async function loginUser(email: string, password: string): Promise<{ user: User; accessToken: string; refreshToken: string } | null> {
-  await ensureUsersAuthCompatibility();
-
-  const db = getDb();
-  const normalizedEmail = normalizeEmail(email);
-  const [foundUser] = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
-
-  if (!foundUser || !foundUser.passwordHash) return null;
-
-  const user = await syncReservedRole(foundUser);
-  if (!user.isActive || !user.passwordHash) return null;
+export async function loginUser(email: string, password: string): Promise<{ user: AuthUser; accessToken: string; refreshToken: string } | null> {
+  const user = await getUserByEmail(email);
+  if (!user || !user.passwordHash || !user.isActive) return null;
 
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) return null;
 
-  await db.update(users).set({ lastActiveAt: new Date(), updatedAt: new Date() }).where(eq(users.id, user.id));
+  const now = new Date();
+  await executeStatement(
+    "update users set lastActiveAt = ?, lastSignedIn = ?, updatedAt = ? where id = ?",
+    [now, now, now, user.id],
+  );
 
+  const refreshedUser = { ...user, lastActiveAt: now, lastSignedIn: now, updatedAt: now };
   const payload: JwtPayload = {
-    userId: user.id,
-    email: user.email,
-    role: user.role,
-    name: user.name,
+    userId: refreshedUser.id,
+    email: refreshedUser.email,
+    role: refreshedUser.role,
+    name: refreshedUser.name,
   };
 
   const [accessToken, refreshToken] = await Promise.all([
@@ -228,67 +319,33 @@ export async function loginUser(email: string, password: string): Promise<{ user
     generateRefreshToken(payload),
   ]);
 
-  return { user, accessToken, refreshToken };
+  return { user: refreshedUser, accessToken, refreshToken };
 }
 
-export async function getUserById(id: string): Promise<User | null> {
-  await ensureUsersAuthCompatibility();
-
-  const db = getDb();
-  const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
-  return user ? syncReservedRole(user) : null;
+export async function getUserById(id: string): Promise<AuthUser | null> {
+  return selectOneBy("select * from users where id = ? limit 1", [id]);
 }
 
-export async function getUserByEmail(email: string): Promise<User | null> {
-  await ensureUsersAuthCompatibility();
-
-  const db = getDb();
-  const [user] = await db.select().from(users).where(eq(users.email, normalizeEmail(email))).limit(1);
-  return user ? syncReservedRole(user) : null;
+export async function getUserByEmail(email: string): Promise<AuthUser | null> {
+  return selectOneBy("select * from users where lower(email) = ? limit 1", [normalizeEmail(email)]);
 }
 
-export async function getUserByOpenId(openId: string): Promise<User | null> {
-  await ensureUsersAuthCompatibility();
-
-  const db = getDb();
-  const [user] = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-  return user ? syncReservedRole(user) : null;
+export async function getUserByOpenId(openId: string): Promise<AuthUser | null> {
+  return selectOneBy("select * from users where openId = ? limit 1", [openId]);
 }
 
-export async function getPendingRegistrationByEmail(email: string): Promise<User | null> {
-  await ensureUsersAuthCompatibility();
-
-  const db = getDb();
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(
-      and(
-        eq(users.email, normalizeEmail(email)),
-        eq(users.loginMethod, PENDING_ALLOWLIST_LOGIN_METHOD),
-      ),
-    )
-    .limit(1);
-
-  return user ? syncReservedRole(user) : null;
+export async function getPendingRegistrationByEmail(email: string): Promise<AuthUser | null> {
+  return selectOneBy(
+    "select * from users where lower(email) = ? and loginMethod = ? limit 1",
+    [normalizeEmail(email), PENDING_ALLOWLIST_LOGIN_METHOD],
+  );
 }
 
-export async function getAccessRequestByEmail(email: string): Promise<User | null> {
-  await ensureUsersAuthCompatibility();
-
-  const db = getDb();
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(
-      and(
-        eq(users.email, normalizeEmail(email)),
-        eq(users.loginMethod, ACCESS_REQUEST_LOGIN_METHOD),
-      ),
-    )
-    .limit(1);
-
-  return user ? syncReservedRole(user) : null;
+export async function getAccessRequestByEmail(email: string): Promise<AuthUser | null> {
+  return selectOneBy(
+    "select * from users where lower(email) = ? and loginMethod = ? limit 1",
+    [normalizeEmail(email), ACCESS_REQUEST_LOGIN_METHOD],
+  );
 }
 
 export async function isEmailApprovedForRegistration(email: string): Promise<boolean> {
@@ -309,28 +366,73 @@ export async function createUser(data: {
   loginMethod?: string;
   invitedBy?: string;
   isActive?: boolean;
-}): Promise<User> {
+}): Promise<AuthUser> {
   await ensureUsersAuthCompatibility();
 
-  const db = getDb();
   const normalizedEmail = normalizeEmail(data.email);
   const passwordHash = data.password ? await hashPassword(data.password) : null;
+  const now = new Date();
+  const role = resolveManagedRole(normalizedEmail, data.role);
 
-  const [user] = await db
-    .insert(users)
-    .values({
-      email: normalizedEmail,
-      name: data.name?.trim() || deriveDisplayNameFromEmail(normalizedEmail),
+  const [result] = await getPool().query(
+    `
+      insert into users (
+        email,
+        name,
+        passwordHash,
+        role,
+        openId,
+        loginMethod,
+        invitedBy,
+        isActive,
+        createdAt,
+        updatedAt,
+        lastSignedIn
+      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+    [
+      normalizedEmail,
+      data.name?.trim() || deriveDisplayNameFromEmail(normalizedEmail),
       passwordHash,
-      role: resolveManagedRole(normalizedEmail, data.role),
-      openId: data.openId ?? null,
-      loginMethod: data.loginMethod ?? null,
-      invitedBy: data.invitedBy ?? null,
-      isActive: data.isActive ?? true,
-    })
-    .returning();
+      role,
+      data.openId ?? null,
+      data.loginMethod ?? null,
+      data.invitedBy ?? null,
+      data.isActive ?? true,
+      now,
+      now,
+      now,
+    ] as any,
+  ) as [ResultSetHeader, any];
 
-  return syncReservedRole(user);
+  const inserted = await getUserById(String(result.insertId));
+  if (!inserted) {
+    throw new Error("Failed to load newly created user");
+  }
+
+  return inserted;
+}
+
+export async function activatePasswordUser(userId: string, input: { name: string; password: string }): Promise<AuthUser> {
+  await ensureUsersAuthCompatibility();
+
+  const now = new Date();
+  const passwordHash = await hashPassword(input.password);
+  await executeStatement(
+    `
+      update users
+      set name = ?, passwordHash = ?, loginMethod = 'password', isActive = true, updatedAt = ?, lastSignedIn = ?
+      where id = ?
+    `,
+    [input.name.trim(), passwordHash, now, now, userId],
+  );
+
+  const updated = await getUserById(userId);
+  if (!updated) {
+    throw new Error("Failed to load updated user after password setup");
+  }
+
+  return updated;
 }
 
 export async function ensureAuthStorageReady(): Promise<void> {

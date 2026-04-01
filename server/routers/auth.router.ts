@@ -14,19 +14,17 @@ import {
   getUserByEmail,
   getUserById,
   verifyPassword,
-  hashPassword,
   generateAccessToken,
   generateRefreshToken,
   verifyRefreshToken,
   isEmailApprovedForRegistration,
   normalizeEmail,
   createUser,
+  activatePasswordUser,
   RESERVED_SUPER_ADMIN_EMAIL,
   ACCESS_REQUEST_LOGIN_METHOD,
   getAccessRequestByEmail,
 } from "../services/auth.service";
-import { getDb } from "../db";
-import { users } from "../db/schema";
 import { getSessionCookieOptions } from "../_core/cookies";
 
 async function issueSessionCookies(
@@ -63,7 +61,6 @@ async function finalizePasswordSetup(
   ctx: { req: any; res: any },
   input: { email: string; name: string; password: string },
 ) {
-  const db = getDb();
   const email = normalizeEmail(input.email);
   const approved = await isEmailApprovedForRegistration(email);
 
@@ -83,22 +80,11 @@ async function finalizePasswordSetup(
     });
   }
 
-  const passwordHash = await hashPassword(input.password);
-
   if (user) {
-    const [updatedUser] = await db
-      .update(users)
-      .set({
-        name: input.name.trim(),
-        passwordHash,
-        loginMethod: "password",
-        isActive: true,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, user.id))
-      .returning();
-
-    user = updatedUser ?? user;
+    user = await activatePasswordUser(user.id, {
+      name: input.name,
+      password: input.password,
+    });
   } else {
     user = await createUser({
       email,
@@ -274,12 +260,10 @@ export const authRouter = router({
           message: "Current password is incorrect",
         });
       }
-      const newHash = await hashPassword(input.newPassword);
-      const db = getDb();
-      await db
-        .update(users)
-        .set({ passwordHash: newHash, updatedAt: new Date() })
-        .where(eq(users.id, ctx.user.id));
+      await activatePasswordUser(ctx.user.id, {
+        name: user.name,
+        password: input.newPassword,
+      });
       return { success: true };
     }),
 });

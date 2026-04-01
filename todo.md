@@ -22,3 +22,7 @@
 - [x] Add a first-time password setup path for approved users, including the super admin account gautham@manipalgroup.info
 - [x] Update the login page UX to make sign-in, registration, and first-time setup options clear
 - [x] Fix the first-time password setup failure caused by a database schema/query mismatch during super-admin onboarding
+- [x] Re-investigate the super-admin first-time password setup failure from first principles and fix the runtime schema inspection bug causing the onboarding flow to break
+- [x] Verify the live database dialect and users table shape against the current auth runtime assumptions for the super-admin set-password flow
+- [x] Trace and fix the exact failing query path in the first-time password setup flow for gautham@manipalgroup.info
+- [x] Add regression tests covering first-time password setup against the legacy live users schema assumptions
