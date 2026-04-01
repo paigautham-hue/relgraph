@@ -2,7 +2,16 @@ import type { CreateExpressContextOptions } from "@trpc/server/adapters/express"
 import { COOKIE_NAME } from "@shared/const";
 import { RELGRAPH_SESSION_COOKIE } from "@shared/constants";
 import type { User } from "../db/schema";
-import { verifyAccessToken, getUserById, getUserByOpenId, createUser } from "../services/auth.service";
+import {
+  verifyAccessToken,
+  getUserById,
+  getUserByOpenId,
+  getUserByEmail,
+  createUser,
+  isEmailApprovedForRegistration,
+  normalizeEmail,
+  RESERVED_SUPER_ADMIN_EMAIL,
+} from "../services/auth.service";
 import { parse as parseCookieHeader } from "cookie";
 import { jwtVerify } from "jose";
 import { ENV } from "./env";
@@ -51,18 +60,30 @@ async function authenticateManus(req: CreateExpressContextOptions["req"]): Promi
     const openId = payload.openId as string;
     if (!openId) return null;
 
-    // Look up by openId
+    const rawEmail = typeof payload.email === "string" ? payload.email : undefined;
+    const normalizedEmail = rawEmail ? normalizeEmail(rawEmail) : `${openId}@manus.local`;
+    const isReservedSuperAdmin = normalizedEmail === RESERVED_SUPER_ADMIN_EMAIL;
+
+    // Look up by openId first, then by email if present
     let user = await getUserByOpenId(openId);
+    if (!user && rawEmail) {
+      user = await getUserByEmail(normalizedEmail);
+    }
+
     if (!user) {
-      // Auto-create viewer user for Manus OAuth users
+      const approved = isReservedSuperAdmin || (rawEmail ? await isEmailApprovedForRegistration(normalizedEmail) : false);
+      if (!approved) {
+        return null;
+      }
+
       try {
         const name = (payload.name as string) || "Manus User";
         user = await createUser({
-          email: `${openId}@manus.local`,
+          email: normalizedEmail,
           name,
           openId,
           loginMethod: "manus_oauth",
-          role: "viewer",
+          role: isReservedSuperAdmin ? "super_admin" : "viewer",
         });
       } catch {
         return null;

@@ -1,18 +1,50 @@
 import { z } from "zod";
+import { and, asc, count, desc, eq, like } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 import { router, adminProcedure } from "../_core/trpc";
-import { inviteUserSchema, updateUserSchema, paginationSchema } from "@shared/validation";
+import {
+  inviteUserSchema,
+  updateUserSchema,
+  paginationSchema,
+  allowlistEmailSchema,
+  removeAllowlistEmailSchema,
+} from "@shared/validation";
 import { getDb } from "../db";
 import { users, userDomainAccess } from "../db/schema";
-import { eq, and, like, desc, asc, count } from "drizzle-orm";
-import { hashPassword } from "../services/auth.service";
+import {
+  createUser,
+  getPendingRegistrationByEmail,
+  hashPassword,
+  normalizeEmail,
+  PENDING_ALLOWLIST_LOGIN_METHOD,
+  RESERVED_SUPER_ADMIN_EMAIL,
+} from "../services/auth.service";
 import { logAudit, getClientIp } from "../middleware/audit";
-import { TRPCError } from "@trpc/server";
 
 const userFilterSchema = paginationSchema.extend({
   search: z.string().optional(),
   role: z.string().optional(),
   isActive: z.boolean().optional(),
 });
+
+function requireSuperAdminForReservedIdentity(targetEmail: string, actorRole: string) {
+  const normalizedEmail = normalizeEmail(targetEmail);
+  if (normalizedEmail === RESERVED_SUPER_ADMIN_EMAIL && actorRole !== "super_admin") {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Only the super admin can modify the reserved super-admin account",
+    });
+  }
+}
+
+function requireSuperAdminForSuperAdminRole(targetRole: string | undefined, actorRole: string) {
+  if (targetRole === "super_admin" && actorRole !== "super_admin") {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Only the super admin can assign the super_admin role",
+    });
+  }
+}
 
 export const adminRouter = router({
   listUsers: adminProcedure.input(userFilterSchema).query(async ({ input }) => {
@@ -77,7 +109,6 @@ export const adminRouter = router({
 
       if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
 
-      // Fetch domain access
       const domainAccessRows = await db
         .select({ domainId: userDomainAccess.domainId })
         .from(userDomainAccess)
@@ -89,14 +120,123 @@ export const adminRouter = router({
       };
     }),
 
-  inviteUser: adminProcedure.input(inviteUserSchema).mutation(async ({ input, ctx }) => {
+  listRegistrationAllowlist: adminProcedure.query(async () => {
     const db = getDb();
+    const rows = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        role: users.role,
+        invitedBy: users.invitedBy,
+        createdAt: users.createdAt,
+      })
+      .from(users)
+      .where(eq(users.loginMethod, PENDING_ALLOWLIST_LOGIN_METHOD))
+      .orderBy(asc(users.email));
 
-    // Check if email already exists
+    return rows;
+  }),
+
+  addRegistrationAllowlistEmail: adminProcedure
+    .input(allowlistEmailSchema)
+    .mutation(async ({ input, ctx }) => {
+      const email = normalizeEmail(input.email);
+      requireSuperAdminForReservedIdentity(email, ctx.user.role);
+      requireSuperAdminForSuperAdminRole(input.role, ctx.user.role);
+
+      const db = getDb();
+      const [existingUser] = await db
+        .select({ id: users.id, loginMethod: users.loginMethod })
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+
+      if (existingUser && existingUser.loginMethod !== PENDING_ALLOWLIST_LOGIN_METHOD) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "A user with this email already exists",
+        });
+      }
+
+      if (existingUser) {
+        const [updated] = await db
+          .update(users)
+          .set({ role: input.role as any, invitedBy: ctx.user.id, updatedAt: new Date() })
+          .where(eq(users.id, existingUser.id))
+          .returning({
+            id: users.id,
+            email: users.email,
+            role: users.role,
+            invitedBy: users.invitedBy,
+          });
+
+        return updated;
+      }
+
+      const created = await createUser({
+        email,
+        name: email,
+        role: input.role,
+        loginMethod: PENDING_ALLOWLIST_LOGIN_METHOD,
+        invitedBy: ctx.user.id,
+        isActive: true,
+      });
+
+      logAudit({
+        userId: ctx.user.id,
+        actionType: "create",
+        entityType: "user",
+        entityId: created.id,
+        newValue: JSON.stringify({ email: created.email, role: created.role, registrationApproved: true }),
+        ipAddress: getClientIp(ctx.req),
+        userAgent: ctx.req.headers["user-agent"] as string,
+      });
+
+      return {
+        id: created.id,
+        email: created.email,
+        role: created.role,
+        invitedBy: created.invitedBy,
+      };
+    }),
+
+  removeRegistrationAllowlistEmail: adminProcedure
+    .input(removeAllowlistEmailSchema)
+    .mutation(async ({ input, ctx }) => {
+      const email = normalizeEmail(input.email);
+      requireSuperAdminForReservedIdentity(email, ctx.user.role);
+
+      const db = getDb();
+      const pendingUser = await getPendingRegistrationByEmail(email);
+      if (!pendingUser) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Allowlisted email not found" });
+      }
+
+      await db.delete(users).where(eq(users.id, pendingUser.id));
+
+      logAudit({
+        userId: ctx.user.id,
+        actionType: "delete",
+        entityType: "user",
+        entityId: pendingUser.id,
+        oldValue: JSON.stringify({ email: pendingUser.email, role: pendingUser.role, registrationApproved: true }),
+        ipAddress: getClientIp(ctx.req),
+        userAgent: ctx.req.headers["user-agent"] as string,
+      });
+
+      return { success: true };
+    }),
+
+  inviteUser: adminProcedure.input(inviteUserSchema).mutation(async ({ input, ctx }) => {
+    const email = normalizeEmail(input.email);
+    requireSuperAdminForReservedIdentity(email, ctx.user.role);
+    requireSuperAdminForSuperAdminRole(input.role, ctx.user.role);
+
+    const db = getDb();
     const [existingUser] = await db
       .select({ id: users.id })
       .from(users)
-      .where(eq(users.email, input.email))
+      .where(eq(users.email, email))
       .limit(1);
 
     if (existingUser) {
@@ -108,15 +248,15 @@ export const adminRouter = router({
     const [newUser] = await db
       .insert(users)
       .values({
-        email: input.email,
+        email,
         name: input.name,
         role: input.role as any,
         passwordHash,
         invitedBy: ctx.user.id,
+        loginMethod: "password",
       })
       .returning();
 
-    // Set domain access
     if (input.domainIds.length > 0) {
       await db.insert(userDomainAccess).values(
         input.domainIds.map((domainId) => ({
@@ -131,7 +271,7 @@ export const adminRouter = router({
       actionType: "create",
       entityType: "user",
       entityId: newUser.id,
-      newValue: JSON.stringify({ email: input.email, name: input.name, role: input.role }),
+      newValue: JSON.stringify({ email: newUser.email, name: newUser.name, role: newUser.role }),
       ipAddress: getClientIp(ctx.req),
       userAgent: ctx.req.headers["user-agent"] as string,
     });
@@ -151,7 +291,16 @@ export const adminRouter = router({
     const [existing] = await db.select().from(users).where(eq(users.id, id)).limit(1);
     if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
 
-    // Update user fields
+    requireSuperAdminForReservedIdentity(existing.email, ctx.user.role);
+    requireSuperAdminForSuperAdminRole(data.role, ctx.user.role);
+
+    if (existing.role === "super_admin" && data.role && data.role !== "super_admin") {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "The reserved super-admin role cannot be downgraded through this action",
+      });
+    }
+
     if (Object.keys(data).length > 0) {
       await db
         .update(users)
@@ -159,7 +308,6 @@ export const adminRouter = router({
         .where(eq(users.id, id));
     }
 
-    // Update domain access if provided
     if (domainIds !== undefined) {
       await db.delete(userDomainAccess).where(eq(userDomainAccess.userId, id));
       if (domainIds.length > 0) {
@@ -191,13 +339,20 @@ export const adminRouter = router({
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
 
-      // Prevent self-deactivation
       if (input.id === ctx.user.id) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot deactivate your own account" });
       }
 
       const [existing] = await db.select().from(users).where(eq(users.id, input.id)).limit(1);
       if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+
+      requireSuperAdminForReservedIdentity(existing.email, ctx.user.role);
+      if (existing.role === "super_admin") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "The reserved super-admin account cannot be deactivated",
+        });
+      }
 
       await db
         .update(users)

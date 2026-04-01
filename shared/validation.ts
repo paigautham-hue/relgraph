@@ -18,6 +18,12 @@ export const changePasswordSchema = z.object({
   newPassword: z.string().min(PASSWORD_MIN_LENGTH),
 });
 
+export const registerSchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(1).max(255),
+  password: z.string().min(PASSWORD_MIN_LENGTH),
+});
+
 // Pagination
 export const paginationSchema = z.object({
   page: z.number().int().min(1).default(1),
@@ -184,6 +190,15 @@ export const updateUserSchema = z.object({
   role: z.enum(USER_ROLES).optional(),
   isActive: z.boolean().optional(),
   domainIds: z.array(z.string().uuid()).optional(),
+});
+
+export const allowlistEmailSchema = z.object({
+  email: z.string().email(),
+  role: z.enum(USER_ROLES).default('viewer'),
+});
+
+export const removeAllowlistEmailSchema = z.object({
+  email: z.string().email(),
 });
 
 // Domain

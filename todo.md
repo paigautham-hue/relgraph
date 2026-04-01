@@ -13,3 +13,7 @@
 - [x] Add a Vitest test to validate the scaffold and required files
 - [x] Verify pnpm install, pnpm check, pnpm build, and pnpm dev for the starter template
 - [x] Fix the frontend styling regression causing the synced login screen to render without the intended Tailwind and component styling
+- [x] Diagnose and fix the published manus.space site availability issue for RelGraph so the deployed domain loads successfully
+- [x] Make gautham@manipalgroup.info the super admin in the RelGraph authorization model
+- [x] Restrict user registration so only pre-approved email addresses added by admins or super admins can register
+- [x] Limit allowlist management capabilities to admin and super admin roles only
