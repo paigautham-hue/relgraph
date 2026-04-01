@@ -52,6 +52,8 @@ import {
   Sparkles,
   Upload,
   Users,
+  History,
+  Settings2,
 } from "lucide-react";
 import { PERSON_CATEGORIES } from "@shared/enums";
 
@@ -66,7 +68,18 @@ type ImportRow = {
   category?: PersonCategory;
   isTracked?: string | boolean | number;
   photoUrl?: string;
+  [key: string]: string | number | boolean | undefined;
 };
+
+const CONTACT_IMPORT_BASE_FIELD_KEYS = new Set([
+  "name",
+  "currentTitle",
+  "organizationName",
+  "domainName",
+  "category",
+  "isTracked",
+  "photoUrl",
+]);
 
 type ParsedUpload = {
   source: "csv" | "xlsx" | "xls";
@@ -116,7 +129,15 @@ async function parseUploadFile(file: File): Promise<ParsedUpload> {
         ? (rawCategory as PersonCategory)
         : undefined;
 
+      const extraValues = Object.fromEntries(
+        headers
+          .filter((header) => !CONTACT_IMPORT_BASE_FIELD_KEYS.has(header))
+          .map((header) => [header, String(cells[header] ?? "").trim()])
+          .filter(([, value]) => value !== ""),
+      );
+
       return {
+        ...extraValues,
         rowNumber: index + 2,
         name: String(cells.name ?? "").trim() || undefined,
         currentTitle: String(cells.currentTitle ?? "").trim() || undefined,
@@ -172,6 +193,10 @@ export default function PersonList() {
 
   const canImport = useMemo(
     () => ["contributor", "manager", "admin", "super_admin"].includes(user?.role ?? "viewer"),
+    [user?.role],
+  );
+  const canManageImportTemplate = useMemo(
+    () => ["admin", "super_admin"].includes(user?.role ?? "viewer"),
     [user?.role],
   );
 
@@ -249,6 +274,14 @@ export default function PersonList() {
   const domains = domainsQuery.data ?? [];
   const organizations = organizationsQuery.data?.data ?? [];
   const template = importTemplateQuery.data;
+  const organizationReference = ((template as {
+    organizationReference?: Array<{
+      id: string;
+      name: string;
+      domainId: string;
+      domainName: string;
+    }>;
+  } | undefined)?.organizationReference ?? []);
   const validation = validateImportMutation.data;
   const previewIssues = validation?.issues ?? [];
   const blockingIssues = previewIssues.filter((issue: any) => issue.severity === "error");
@@ -294,7 +327,7 @@ export default function PersonList() {
     );
     XLSX.utils.book_append_sheet(
       workbook,
-      XLSX.utils.json_to_sheet(template.organizationReference),
+      XLSX.utils.json_to_sheet(organizationReference),
       "Organization Reference",
     );
     XLSX.writeFile(workbook, "relgraph-contact-import-template.xlsx");
@@ -341,6 +374,7 @@ export default function PersonList() {
         category: row.category,
         isTracked: row.isTracked,
         photoUrl: row.photoUrl,
+        extraFieldValues: row.extraFieldValues ?? {},
       })),
     });
   };
@@ -349,6 +383,18 @@ export default function PersonList() {
     <div className="space-y-6">
       <PageHeader title="People" subtitle={`${total} contacts tracked`}>
         <div className="flex flex-wrap items-center gap-3">
+          {canImport && (
+            <Button type="button" variant="outline" onClick={() => navigate("/persons/import-history")}>
+              <History className="mr-2 h-4 w-4" />
+              Import History
+            </Button>
+          )}
+          {canManageImportTemplate && (
+            <Button type="button" variant="outline" onClick={() => navigate("/admin/contact-import")}>
+              <Settings2 className="mr-2 h-4 w-4" />
+              Import Template Settings
+            </Button>
+          )}
           {canImport && (
             <Dialog
               open={importDialogOpen}
@@ -505,6 +551,42 @@ export default function PersonList() {
                           </div>
                         </div>
 
+                        {validation.blockedByDuplicates && (
+                          <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4 text-sm text-rose-800">
+                            <div className="mb-2 inline-flex items-center gap-2 font-medium">
+                              <AlertCircle className="h-4 w-4" />
+                              Duplicate review required
+                            </div>
+                            <p>
+                              RelGraph found likely duplicate contacts already in the system. This import is intentionally blocked until the source file is corrected or the rows are reviewed from the import history page.
+                            </p>
+                            {(validation.duplicateRows ?? []).length > 0 && (
+                              <div className="mt-4 space-y-3">
+                                {(validation.duplicateRows ?? []).map((duplicate: any) => (
+                                  <div key={duplicate.rowNumber} className="rounded-xl border border-rose-500/15 bg-background/80 p-3">
+                                    <p className="font-medium text-foreground">
+                                      Row {duplicate.rowNumber}: {duplicate.name}
+                                    </p>
+                                    <div className="mt-2 space-y-2 text-sm text-muted-foreground">
+                                      {(duplicate.candidates ?? []).map((candidate: any) => (
+                                        <div key={candidate.personId} className="rounded-lg border border-border/60 px-3 py-2">
+                                          <p className="font-medium text-foreground">{candidate.name}</p>
+                                          <p>
+                                            {candidate.currentTitle || "No title recorded"}
+                                            {candidate.organizationName ? ` · ${candidate.organizationName}` : ""}
+                                            {candidate.domainName ? ` · ${candidate.domainName}` : ""}
+                                          </p>
+                                          <p>Match score: {candidate.score} · {candidate.reason}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         {validation.review.warnings.length > 0 && (
                           <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 text-sm text-amber-800">
                             <div className="mb-2 inline-flex items-center gap-2 font-medium">
@@ -572,7 +654,7 @@ export default function PersonList() {
                     type="button"
                     className="bg-[var(--relgraph-primary)] hover:bg-[var(--relgraph-primary-dark)]"
                     onClick={handleCommitImport}
-                    disabled={!validation?.ok || commitImportMutation.isPending || validateImportMutation.isPending}
+                    disabled={!validation?.ok || validation?.blockedByDuplicates || commitImportMutation.isPending || validateImportMutation.isPending}
                   >
                     {commitImportMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Import validated contacts

@@ -13,11 +13,13 @@ import UserManagement from "./pages/admin/UserManagement";
 import AccessRequestsPage from "./pages/admin/AccessRequests";
 import DomainManagement from "./pages/admin/DomainManagement";
 import AuditLog from "./pages/admin/AuditLog";
+import ContactImportSettings from "./pages/admin/ContactImportSettings";
 import NetworkMap from "./pages/NetworkMap";
 import PathFinder from "./pages/PathFinder";
 import AlertsPage from "./pages/AlertsPage";
 import BriefingsPage from "./pages/BriefingsPage";
 import OrganizationList from "./pages/OrganizationList";
+import PersonImportHistory from "./pages/PersonImportHistory";
 import { QuickLogModal } from "./components/input/QuickLogModal";
 import ChatPanel from "./components/chat/ChatPanel";
 
@@ -27,6 +29,7 @@ function AppRoutes() {
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/persons" component={PersonList} />
+        <Route path="/persons/import-history" component={PersonImportHistory} />
         <Route path="/organizations" component={OrganizationList} />
         <Route path="/persons/:id" component={PersonProfile} />
         <Route path="/network" component={NetworkMap} />
@@ -36,6 +39,7 @@ function AppRoutes() {
         <Route path="/admin/users" component={UserManagement} />
         <Route path="/admin/requests" component={AccessRequestsPage} />
         <Route path="/admin/domains" component={DomainManagement} />
+        <Route path="/admin/contact-import" component={ContactImportSettings} />
         <Route path="/admin/audit" component={AuditLog} />
         <Route>
           <div className="flex flex-col items-center justify-center py-24 text-center">

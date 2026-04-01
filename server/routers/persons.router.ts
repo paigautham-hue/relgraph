@@ -1,5 +1,7 @@
-import { createHash } from "node:crypto";
+import { createHash } from "crypto";
 import { z } from "zod";
+import { eq, and, like, desc, asc, count, inArray } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 import { router, domainScopedProcedure, contributorProcedure } from "../_core/trpc";
 import {
   createPersonSchema,
@@ -7,17 +9,24 @@ import {
   personFilterSchema,
   validateContactImportSchema,
   commitContactImportSchema,
+  contactImportHistoryFilterSchema,
+  contactImportRunLookupSchema,
+  resolveContactImportDuplicatesSchema,
 } from "@shared/validation";
+import { ROLE_LEVELS, type UserRole } from "@shared/enums";
 import { getDb } from "../db";
-import { persons, organizations, domains } from "../db/schema";
-import { eq, and, like, desc, asc, count, inArray } from "drizzle-orm";
+import { persons, organizations, domains, personIntel, personNotes } from "../db/schema";
 import { logAudit, getClientIp } from "../middleware/audit";
-import { TRPCError } from "@trpc/server";
 import {
+  buildContactImportArtifacts,
+  buildContactImportRunPayload,
+  getContactImportHistoryEntry,
+  getContactImportTemplateFieldLibrary,
   getContactImportTemplatePayload,
+  getStoredContactImportTemplateConfig,
+  listContactImportHistory,
   validateContactImport,
 } from "../services/contact-import.service";
-import { ROLE_LEVELS, type UserRole } from "@shared/enums";
 
 function assertCanImport(role: string) {
   const userLevel = ROLE_LEVELS[role as UserRole] ?? 0;
@@ -121,7 +130,7 @@ export const personsRouter = router({
   getImportTemplate: domainScopedProcedure.query(async ({ ctx }) => {
     assertCanImport(ctx.user.role);
     const db = getDb();
-    const template = getContactImportTemplatePayload();
+    const template = await getContactImportTemplatePayload();
 
     const accessibleOrganizations = await db
       .select({
@@ -141,7 +150,17 @@ export const personsRouter = router({
 
     return {
       ...template,
+      fieldLibrary: getContactImportTemplateFieldLibrary(),
       organizationReference: accessibleOrganizations,
+    };
+  }),
+
+  getImportTemplateConfig: domainScopedProcedure.query(async ({ ctx }) => {
+    assertCanImport(ctx.user.role);
+    const stored = await getStoredContactImportTemplateConfig();
+    return {
+      ...stored,
+      fieldLibrary: getContactImportTemplateFieldLibrary(),
     };
   }),
 
@@ -169,9 +188,11 @@ export const personsRouter = router({
           rowCount: input.rows.length,
           validRows: result.validRows.length,
           issueCount: result.issues.length,
+          duplicateCount: result.duplicateRows.length,
           verdict: result.review.verdict,
           score: result.review.score,
           ok: result.ok,
+          blockedByDuplicates: result.blockedByDuplicates,
         }),
         inputMethod: "system",
         ipAddress: getClientIp(ctx.req),
@@ -182,7 +203,111 @@ export const personsRouter = router({
         },
       });
 
+      await logAudit({
+        userId: ctx.user.id,
+        actionType: "create",
+        entityType: "person",
+        fieldName: "contact_import.run",
+        newValue: JSON.stringify(
+          buildContactImportRunPayload({
+            status: result.blockedByDuplicates || result.issues.some((issue) => issue.severity === "error")
+              ? "blocked"
+              : "validated",
+            category: result.validRows[0]?.category,
+            result,
+          }),
+        ),
+        inputMethod: "system",
+        ipAddress: getClientIp(ctx.req),
+        userAgent: ctx.req.headers["user-agent"] as string,
+        metadata: {
+          source: input.source,
+          templateVersion: input.templateVersion,
+        },
+      });
+
       return result;
+    }),
+
+  resolveImportDuplicates: domainScopedProcedure
+    .input(resolveContactImportDuplicatesSchema)
+    .mutation(async ({ input, ctx }) => {
+      assertCanImport(ctx.user.role);
+
+      const history = await listContactImportHistory({ page: 1, pageSize: 200 });
+      const matchingRun = history.data.find((entry) => entry.validationDigest === input.validationDigest);
+
+      if (!matchingRun) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "The import preview could not be found. Please validate the file again.",
+        });
+      }
+
+      const historyEntry = await getContactImportHistoryEntry(matchingRun.id);
+      const errorReport = historyEntry?.errorReport ?? [];
+      const unresolvedRows = errorReport
+        .filter((issue) => issue.message.includes("Likely duplicate contacts were found in RelGraph"))
+        .map((issue) => issue.rowNumber);
+
+      const requestedRows = new Set(input.rows.map((row) => row.rowNumber));
+      const missingRows = unresolvedRows.filter((rowNumber) => !requestedRows.has(rowNumber));
+      if (missingRows.length > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Every duplicate row must be resolved before import can continue.",
+        });
+      }
+
+      await logAudit({
+        userId: ctx.user.id,
+        actionType: "update",
+        entityType: "person",
+        fieldName: "contact_import.duplicate_resolution",
+        newValue: JSON.stringify({
+          validationDigest: input.validationDigest,
+          rows: input.rows,
+        }),
+        inputMethod: "system",
+        ipAddress: getClientIp(ctx.req),
+        userAgent: ctx.req.headers["user-agent"] as string,
+      });
+
+      return {
+        success: true,
+        validationDigest: input.validationDigest,
+        resolvedRows: input.rows.length,
+      };
+    }),
+
+  listImportHistory: domainScopedProcedure
+    .input(contactImportHistoryFilterSchema.optional())
+    .query(async ({ input, ctx }) => {
+      assertCanImport(ctx.user.role);
+
+      const page = input?.page ?? 1;
+      const pageSize = input?.pageSize ?? 20;
+      return listContactImportHistory({
+        page,
+        pageSize,
+        status: input?.status,
+        category: input?.category,
+        source: input?.source,
+        createdByUserId: input?.createdByUserId,
+        search: input?.search,
+      });
+    }),
+
+  getImportHistoryEntry: domainScopedProcedure
+    .input(contactImportRunLookupSchema)
+    .query(async ({ input, ctx }) => {
+      assertCanImport(ctx.user.role);
+
+      const entry = await getContactImportHistoryEntry(input.id);
+      if (!entry) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Import history entry not found." });
+      }
+      return entry;
     }),
 
   commitImport: domainScopedProcedure
@@ -204,10 +329,35 @@ export const personsRouter = router({
         });
       }
 
+      const revalidated = await validateContactImport({
+        fileName: input.fileName,
+        source: "csv",
+        templateVersion: input.templateVersion,
+        headers: (await getContactImportTemplatePayload()).headers,
+        rows: input.rows.map((row: (typeof input.rows)[number]) => ({
+          rowNumber: row.rowNumber,
+          name: row.name,
+          currentTitle: row.currentTitle,
+          category: row.category,
+          isTracked: row.isTracked,
+          photoUrl: row.photoUrl,
+          organizationName: undefined,
+          domainName: undefined,
+        })),
+        accessibleDomainIds: ctx.accessibleDomainIds,
+      }).catch(() => null);
+
+      if (revalidated && revalidated.duplicateRows.length > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Likely duplicates still need resolution before import can continue.",
+        });
+      }
+
       const created = await db
         .insert(persons)
         .values(
-          input.rows.map((row) => ({
+          input.rows.map((row: (typeof input.rows)[number]) => ({
             name: row.name,
             currentTitle: row.currentTitle,
             currentOrgId: row.organizationId ?? null,
@@ -219,6 +369,63 @@ export const personsRouter = router({
         )
         .returning();
 
+      const createdByRowNumber = new Map(
+        created.map((person, index) => [input.rows[index]?.rowNumber, person] as const),
+      );
+
+      const intelPayload = input.rows.flatMap((row: (typeof input.rows)[number]) => {
+        const createdPerson = createdByRowNumber.get(row.rowNumber);
+        if (!createdPerson) return [];
+        const artifacts = buildContactImportArtifacts({
+          row: {
+            rowNumber: row.rowNumber,
+            name: row.name,
+            currentTitle: row.currentTitle,
+            organizationId: row.organizationId ?? null,
+            category: row.category,
+            isTracked: row.isTracked,
+            photoUrl: row.photoUrl,
+            organizationName: undefined,
+            domainName: undefined,
+            extraFieldValues: row.extraFieldValues,
+            duplicateCandidates: [],
+          },
+          personId: createdPerson.id,
+          userId: ctx.user.id,
+        });
+        return artifacts.intelEntries;
+      });
+
+      const notePayload = input.rows.flatMap((row: (typeof input.rows)[number]) => {
+        const createdPerson = createdByRowNumber.get(row.rowNumber);
+        if (!createdPerson) return [];
+        const artifacts = buildContactImportArtifacts({
+          row: {
+            rowNumber: row.rowNumber,
+            name: row.name,
+            currentTitle: row.currentTitle,
+            organizationId: row.organizationId ?? null,
+            category: row.category,
+            isTracked: row.isTracked,
+            photoUrl: row.photoUrl,
+            organizationName: undefined,
+            domainName: undefined,
+            extraFieldValues: row.extraFieldValues,
+            duplicateCandidates: [],
+          },
+          personId: createdPerson.id,
+          userId: ctx.user.id,
+        });
+        return artifacts.noteEntry ? [artifacts.noteEntry] : [];
+      });
+
+      if (intelPayload.length > 0) {
+        await db.insert(personIntel).values(intelPayload);
+      }
+      if (notePayload.length > 0) {
+        await db.insert(personNotes).values(notePayload);
+      }
+
       await logAudit({
         userId: ctx.user.id,
         actionType: "create",
@@ -228,6 +435,31 @@ export const personsRouter = router({
           fileName: input.fileName,
           importedCount: created.length,
           validationDigest: input.validationDigest,
+        }),
+        inputMethod: "system",
+        ipAddress: getClientIp(ctx.req),
+        userAgent: ctx.req.headers["user-agent"] as string,
+      });
+
+      await logAudit({
+        userId: ctx.user.id,
+        actionType: "create",
+        entityType: "person",
+        fieldName: "contact_import.run",
+        newValue: JSON.stringify({
+          status: "imported",
+          fileName: input.fileName,
+          source: "csv",
+          templateVersion: input.templateVersion,
+          rowCount: input.rows.length,
+          validRowCount: input.rows.length,
+          issueCount: 0,
+          duplicateCount: 0,
+          aiVerdict: "pass",
+          validationDigest: input.validationDigest,
+          category: input.rows[0]?.category,
+          summary: `${created.length} contacts were imported successfully.`,
+          errorReport: [],
         }),
         inputMethod: "system",
         ipAddress: getClientIp(ctx.req),

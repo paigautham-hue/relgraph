@@ -36,3 +36,10 @@
 - [x] Add downloadable Excel and CSV contact import templates with strict required columns
 - [x] Add AI-assisted pre-import validation to catch field mismatches and unsafe rows before creating contacts
 - [x] Add a polished contact import UI with preview, errors, and confirmation flow
+- [x] Add an import history screen with downloadable error reports
+- [x] Add duplicate-contact detection with merge suggestions before final import
+- [x] Add admin-configurable template fields for different contact categories
+- [x] Fix the contact import dynamic template header export mismatch so downloaded templates and validator expectations stay aligned
+- [x] Add a People import history view with searchable validation and import run details
+- [x] Add an admin contact-import template settings screen for category-based field configuration
+- [x] Update the People import dialog to handle duplicate blocking, dynamic extra columns, and import history access

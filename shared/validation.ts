@@ -10,6 +10,8 @@ import {
   CONTACT_IMPORT_HEADERS,
   CONTACT_IMPORT_MAX_ROWS,
   CONTACT_IMPORT_TEMPLATE_VERSION,
+  CONTACT_IMPORT_FIELD_LIBRARY,
+  DEFAULT_CONTACT_IMPORT_CATEGORY_FIELDS,
 } from './contactImport';
 
 // Auth
@@ -244,7 +246,7 @@ export const contactImportRowSchema = z.object({
   category: z.enum(PERSON_CATEGORIES).optional(),
   isTracked: z.union([z.boolean(), z.string(), z.number()]).optional(),
   photoUrl: z.string().optional(),
-});
+}).catchall(z.union([z.string(), z.number(), z.boolean(), z.null(), z.undefined()]));
 
 export const validateContactImportSchema = z.object({
   fileName: z.string().min(1).max(255),
@@ -266,9 +268,50 @@ export const commitContactImportSchema = z.object({
       category: z.enum(PERSON_CATEGORIES).optional(),
       isTracked: z.boolean(),
       photoUrl: z.string().url().optional(),
+      extraFieldValues: z.record(z.string(), z.string()).default({}),
     }),
   ).min(1).max(CONTACT_IMPORT_MAX_ROWS),
   validationDigest: z.string().min(8),
+});
+
+const contactImportExtraFieldKeys = Object.keys(CONTACT_IMPORT_FIELD_LIBRARY) as [
+  keyof typeof CONTACT_IMPORT_FIELD_LIBRARY,
+  ...(keyof typeof CONTACT_IMPORT_FIELD_LIBRARY)[],
+];
+
+export const contactImportTemplateFieldConfigSchema = z.object({
+  category: z.enum(PERSON_CATEGORIES),
+  enabledFieldKeys: z.array(z.enum(contactImportExtraFieldKeys)).max(contactImportExtraFieldKeys.length),
+});
+
+export const updateContactImportTemplateConfigSchema = z.object({
+  templateVersion: z.string().min(1).default(CONTACT_IMPORT_TEMPLATE_VERSION),
+  categories: z.array(contactImportTemplateFieldConfigSchema)
+    .min(1)
+    .default(DEFAULT_CONTACT_IMPORT_CATEGORY_FIELDS),
+});
+
+export const contactImportHistoryFilterSchema = paginationSchema.extend({
+  status: z.enum(["validated", "blocked", "imported"]).optional(),
+  category: z.enum(PERSON_CATEGORIES).optional(),
+  source: contactImportSourceSchema.optional(),
+  createdByUserId: z.string().uuid().optional(),
+  search: z.string().optional(),
+});
+
+export const contactImportRunLookupSchema = z.object({
+  id: z.string().uuid(),
+});
+
+export const resolveContactImportDuplicatesSchema = z.object({
+  validationDigest: z.string().min(8),
+  rows: z.array(
+    z.object({
+      rowNumber: z.number().int().min(2),
+      selectedExistingPersonId: z.string().uuid().optional(),
+      resolution: z.enum(["skip_existing", "import_anyway"]),
+    }),
+  ).min(1),
 });
 
 // Domain

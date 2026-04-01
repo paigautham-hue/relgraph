@@ -10,6 +10,7 @@ import {
   removeAllowlistEmailSchema,
   bulkAccessRequestApprovalSchema,
   bulkAccessRequestDenialSchema,
+  updateContactImportTemplateConfigSchema,
 } from "@shared/validation";
 import { getDb } from "../db";
 import { users, userDomainAccess } from "../db/schema";
@@ -23,6 +24,11 @@ import {
   PENDING_ALLOWLIST_LOGIN_METHOD,
   RESERVED_SUPER_ADMIN_EMAIL,
 } from "../services/auth.service";
+import {
+  getContactImportTemplateFieldLibrary,
+  getContactImportTemplatePayload,
+  getStoredContactImportTemplateConfig,
+} from "../services/contact-import.service";
 import { logAudit, getClientIp } from "../middleware/audit";
 
 const userFilterSchema = paginationSchema.extend({
@@ -91,6 +97,56 @@ export const adminRouter = router({
       totalPages: Math.ceil(total / pageSize),
     };
   }),
+
+  getContactImportTemplateConfig: adminProcedure.query(async () => {
+    const stored = await getStoredContactImportTemplateConfig();
+    const template = await getContactImportTemplatePayload(stored.categories);
+
+    return {
+      ...stored,
+      headers: template.headers,
+      columns: template.columns,
+      fieldLibrary: getContactImportTemplateFieldLibrary(),
+    };
+  }),
+
+  updateContactImportTemplateConfig: adminProcedure
+    .input(updateContactImportTemplateConfigSchema)
+    .mutation(async ({ input, ctx }) => {
+      const previous = await getStoredContactImportTemplateConfig();
+      const template = await getContactImportTemplatePayload(input.categories);
+
+      await logAudit({
+        userId: ctx.user.id,
+        actionType: "update",
+        entityType: "person",
+        fieldName: "contact_import.template_config",
+        oldValue: JSON.stringify({
+          templateVersion: previous.templateVersion,
+          categories: previous.categories,
+        }),
+        newValue: JSON.stringify({
+          templateVersion: input.templateVersion,
+          categories: input.categories,
+        }),
+        inputMethod: "system",
+        ipAddress: getClientIp(ctx.req),
+        userAgent: ctx.req.headers["user-agent"] as string,
+        metadata: {
+          templateVersion: input.templateVersion,
+          headerCount: template.headers.length,
+        },
+      });
+
+      return {
+        success: true,
+        templateVersion: input.templateVersion,
+        categories: input.categories,
+        headers: template.headers,
+        columns: template.columns,
+        fieldLibrary: getContactImportTemplateFieldLibrary(),
+      };
+    }),
 
   getUser: adminProcedure
     .input(z.object({ id: z.string().uuid() }))
