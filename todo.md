@@ -12,3 +12,4 @@
 - [x] Update README.md with quick start, stack, structure, and deployment notes
 - [x] Add a Vitest test to validate the scaffold and required files
 - [x] Verify pnpm install, pnpm check, pnpm build, and pnpm dev for the starter template
+- [x] Fix the frontend styling regression causing the synced login screen to render without the intended Tailwind and component styling
