@@ -26,3 +26,6 @@
 - [x] Verify the live database dialect and users table shape against the current auth runtime assumptions for the super-admin set-password flow
 - [x] Trace and fix the exact failing query path in the first-time password setup flow for gautham@manipalgroup.info
 - [x] Add regression tests covering first-time password setup against the legacy live users schema assumptions
+- [x] Add an admin screen for reviewing and approving access requests
+- [x] Add inline success and error feedback on the Set password form
+- [x] Add a lightweight audit log for onboarding and login events

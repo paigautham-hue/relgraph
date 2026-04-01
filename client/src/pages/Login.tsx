@@ -79,7 +79,7 @@ export default function LoginPage() {
   const setupPasswordMutation = trpc.auth.setupPassword.useMutation({
     onSuccess: () => {
       toast.success("Password created successfully. You are now signed in.");
-      navigate("/");
+      window.setTimeout(() => navigate("/"), 900);
     },
     onError: (err) => {
       toast.error(err.message || "Password setup failed");
@@ -213,6 +213,20 @@ export default function LoginPage() {
               <div className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
                 Use this if your email has already been approved but you have not created a password yet. This is the correct first step for <strong>gautham@manipalgroup.info</strong>.
               </div>
+              {setupPasswordMutation.isSuccess ? (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 p-3 text-sm text-emerald-900">
+                  <p className="font-medium">Password created successfully.</p>
+                  <p className="mt-1 text-emerald-800/90">
+                    Your account is now active and you will be redirected into RelGraph in a moment.
+                  </p>
+                </div>
+              ) : null}
+              {setupPasswordMutation.error ? (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                  <p className="font-medium">We could not complete password setup.</p>
+                  <p className="mt-1">{setupPasswordMutation.error.message}</p>
+                </div>
+              ) : null}
               <form onSubmit={registerForm.handleSubmit(onSetupPasswordSubmit)} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="setup-name">Full name</Label>

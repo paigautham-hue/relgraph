@@ -26,6 +26,7 @@ import {
   getAccessRequestByEmail,
 } from "../services/auth.service";
 import { getSessionCookieOptions } from "../_core/cookies";
+import { logAudit, getClientIp } from "../middleware/audit";
 
 async function issueSessionCookies(
   ctx: { req: any; res: any },
@@ -60,6 +61,7 @@ async function issueSessionCookies(
 async function finalizePasswordSetup(
   ctx: { req: any; res: any },
   input: { email: string; name: string; password: string },
+  source: "register" | "setup_password",
 ) {
   const email = normalizeEmail(input.email);
   const approved = await isEmailApprovedForRegistration(email);
@@ -72,6 +74,7 @@ async function finalizePasswordSetup(
   }
 
   let user = await getUserByEmail(email);
+  const existingUser = user;
 
   if (user && user.passwordHash && user.loginMethod !== "allowlist_pending") {
     throw new TRPCError({
@@ -103,6 +106,23 @@ async function finalizePasswordSetup(
     name: user.name,
   });
 
+  void logAudit({
+    userId: user.id,
+    actionType: existingUser ? "update" : "create",
+    entityType: "user",
+    entityId: user.id,
+    fieldName: source === "setup_password" ? "auth.password_setup" : "auth.registration_complete",
+    newValue: JSON.stringify({
+      event: source,
+      email: user.email,
+      role: user.role,
+      activatedExistingUser: Boolean(existingUser),
+    }),
+    inputMethod: "form",
+    ipAddress: getClientIp(ctx.req),
+    userAgent: ctx.req.headers["user-agent"] as string,
+  });
+
   return {
     user: {
       id: user.id,
@@ -131,6 +151,23 @@ export const authRouter = router({
       maxAge: 604_800_000,
     });
 
+    void logAudit({
+      userId: result.user.id,
+      actionType: "update",
+      entityType: "user",
+      entityId: result.user.id,
+      fieldName: "auth.login",
+      newValue: JSON.stringify({
+        event: "login",
+        email: result.user.email,
+        role: result.user.role,
+        method: "password",
+      }),
+      inputMethod: "form",
+      ipAddress: getClientIp(ctx.req),
+      userAgent: ctx.req.headers["user-agent"] as string,
+    });
+
     return {
       user: {
         id: result.user.id,
@@ -142,7 +179,7 @@ export const authRouter = router({
     };
   }),
 
-  requestAccess: publicProcedure.input(requestAccessSchema).mutation(async ({ input }) => {
+  requestAccess: publicProcedure.input(requestAccessSchema).mutation(async ({ input, ctx }) => {
     const email = normalizeEmail(input.email);
 
     if (email === RESERVED_SUPER_ADMIN_EMAIL) {
@@ -176,12 +213,28 @@ export const authRouter = router({
       };
     }
 
-    await createUser({
+    const requestUser = await createUser({
       email,
       name: input.name?.trim() || email,
       role: "viewer",
       loginMethod: ACCESS_REQUEST_LOGIN_METHOD,
       isActive: false,
+    });
+
+    void logAudit({
+      userId: requestUser.id,
+      actionType: "create",
+      entityType: "user",
+      entityId: requestUser.id,
+      fieldName: "auth.access_request",
+      newValue: JSON.stringify({
+        event: "access_request",
+        email,
+        name: requestUser.name,
+      }),
+      inputMethod: "form",
+      ipAddress: getClientIp(ctx.req),
+      userAgent: ctx.req.headers["user-agent"] as string,
     });
 
     return {
@@ -191,11 +244,11 @@ export const authRouter = router({
   }),
 
   register: publicProcedure.input(registerSchema).mutation(async ({ input, ctx }) => {
-    return finalizePasswordSetup(ctx, input);
+    return finalizePasswordSetup(ctx, input, "register");
   }),
 
   setupPassword: publicProcedure.input(setupPasswordSchema).mutation(async ({ input, ctx }) => {
-    return finalizePasswordSetup(ctx, input);
+    return finalizePasswordSetup(ctx, input, "setup_password");
   }),
 
   me: protectedProcedure.query(({ ctx }) => {

@@ -28,6 +28,7 @@ import {
   Globe,
   LayoutDashboard,
   LogOut,
+  Mail,
   Network,
   PanelLeft,
   ScrollText,
@@ -52,6 +53,7 @@ const menuItems = [
 
 const adminItems = [
   { icon: UserCog, label: "Users", path: "/admin/users" },
+  { icon: Mail, label: "Access Requests", path: "/admin/requests" },
   { icon: Globe, label: "Domains", path: "/admin/domains" },
   { icon: ScrollText, label: "Audit Log", path: "/admin/audit" },
 ];
@@ -225,7 +227,7 @@ function DashboardLayoutContent({
             </SidebarMenu>
 
             {/* Admin Section */}
-            {user?.role === "admin" && (
+            {(user?.role === "admin" || user?.role === "super_admin") && (
               <>
                 <div className="px-4 pt-4 pb-1">
                   {!isCollapsed && (

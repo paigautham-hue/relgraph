@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import PersonList from "./pages/PersonList";
 import PersonProfile from "./pages/PersonProfile";
 import UserManagement from "./pages/admin/UserManagement";
+import AccessRequestsPage from "./pages/admin/AccessRequests";
 import DomainManagement from "./pages/admin/DomainManagement";
 import AuditLog from "./pages/admin/AuditLog";
 import NetworkMap from "./pages/NetworkMap";
@@ -33,6 +34,7 @@ function AppRoutes() {
         <Route path="/alerts" component={AlertsPage} />
         <Route path="/briefings" component={BriefingsPage} />
         <Route path="/admin/users" component={UserManagement} />
+        <Route path="/admin/requests" component={AccessRequestsPage} />
         <Route path="/admin/domains" component={DomainManagement} />
         <Route path="/admin/audit" component={AuditLog} />
         <Route>
