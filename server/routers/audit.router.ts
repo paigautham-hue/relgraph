@@ -3,12 +3,25 @@ import { router, adminProcedure } from "../_core/trpc";
 import { auditFilterSchema } from "@shared/validation";
 import { getDb } from "../db";
 import { auditLog, users } from "../db/schema";
-import { eq, and, desc, asc, count, gte, lte } from "drizzle-orm";
+import { eq, and, desc, asc, count, gte, lte, like } from "drizzle-orm";
 
 export const auditRouter = router({
   list: adminProcedure.input(auditFilterSchema).query(async ({ input }) => {
     const db = getDb();
-    const { page, pageSize, userId, actionType, entityType, entityId, startDate, endDate, sortOrder } = input;
+    const {
+      page,
+      pageSize,
+      userId,
+      actionType,
+      entityType,
+      entityId,
+      email,
+      outcome,
+      authOnly,
+      startDate,
+      endDate,
+      sortOrder,
+    } = input;
     const offset = (page - 1) * pageSize;
 
     const conditions: ReturnType<typeof eq>[] = [];
@@ -16,6 +29,9 @@ export const auditRouter = router({
     if (actionType) conditions.push(eq(auditLog.actionType, actionType as any));
     if (entityType) conditions.push(eq(auditLog.entityType, entityType as any));
     if (entityId) conditions.push(eq(auditLog.entityId, entityId));
+    if (email) conditions.push(like(users.email, `%${email}%`));
+    if (outcome) conditions.push(like(auditLog.newValue, `%\"outcome\":\"${outcome}\"%`));
+    if (authOnly) conditions.push(like(auditLog.fieldName, "auth.%"));
     if (startDate) conditions.push(gte(auditLog.createdAt, new Date(startDate)));
     if (endDate) conditions.push(lte(auditLog.createdAt, new Date(endDate)));
 

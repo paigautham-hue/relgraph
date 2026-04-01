@@ -183,6 +183,9 @@ export const auditFilterSchema = paginationSchema.extend({
   actionType: z.string().optional(),
   entityType: z.string().optional(),
   entityId: z.string().uuid().optional(),
+  email: z.string().optional(),
+  outcome: z.string().optional(),
+  authOnly: z.boolean().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
 });
@@ -211,6 +214,17 @@ export const allowlistEmailSchema = z.object({
 
 export const removeAllowlistEmailSchema = z.object({
   email: z.string().email(),
+});
+
+export const bulkAccessRequestApprovalSchema = z.object({
+  requests: z.array(z.object({
+    email: z.string().email(),
+    role: z.enum(USER_ROLES),
+  })).min(1),
+});
+
+export const bulkAccessRequestDenialSchema = z.object({
+  emails: z.array(z.string().email()).min(1),
 });
 
 // Domain

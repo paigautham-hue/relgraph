@@ -8,6 +8,8 @@ import {
   paginationSchema,
   allowlistEmailSchema,
   removeAllowlistEmailSchema,
+  bulkAccessRequestApprovalSchema,
+  bulkAccessRequestDenialSchema,
 } from "@shared/validation";
 import { getDb } from "../db";
 import { users, userDomainAccess } from "../db/schema";
@@ -191,8 +193,9 @@ export const adminRouter = router({
         actionType: "update",
         entityType: "user",
         entityId: requestUser.id,
+        fieldName: "auth.access_request_approved",
         oldValue: JSON.stringify({ email: requestUser.email, status: "access_requested" }),
-        newValue: JSON.stringify({ email: requestUser.email, role: input.role, status: "registration_approved" }),
+        newValue: JSON.stringify({ email: requestUser.email, role: input.role, status: "registration_approved", outcome: "approved" }),
         ipAddress: getClientIp(ctx.req),
         userAgent: ctx.req.headers["user-agent"] as string,
       });
@@ -219,13 +222,106 @@ export const adminRouter = router({
         actionType: "delete",
         entityType: "user",
         entityId: requestUser.id,
+        fieldName: "auth.access_request_denied",
         oldValue: JSON.stringify({ email: requestUser.email, status: "access_requested" }),
-        newValue: JSON.stringify({ status: "access_denied" }),
+        newValue: JSON.stringify({ email: requestUser.email, status: "access_denied", outcome: "denied" }),
         ipAddress: getClientIp(ctx.req),
         userAgent: ctx.req.headers["user-agent"] as string,
       });
 
       return { success: true };
+    }),
+
+  bulkApproveAccessRequests: adminProcedure
+    .input(bulkAccessRequestApprovalSchema)
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb();
+      const approved: Array<{ id: string; email: string; role: string; invitedBy: string | null }> = [];
+
+      for (const request of input.requests) {
+        const email = normalizeEmail(request.email);
+        requireSuperAdminForReservedIdentity(email, ctx.user.role);
+        requireSuperAdminForSuperAdminRole(request.role, ctx.user.role);
+
+        const requestUser = await getAccessRequestByEmail(email);
+        if (!requestUser) {
+          throw new TRPCError({ code: "NOT_FOUND", message: `Access request not found for ${email}` });
+        }
+
+        const [updated] = await db
+          .update(users)
+          .set({
+            role: request.role as any,
+            invitedBy: ctx.user.id,
+            loginMethod: PENDING_ALLOWLIST_LOGIN_METHOD,
+            isActive: true,
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, requestUser.id))
+          .returning({
+            id: users.id,
+            email: users.email,
+            role: users.role,
+            invitedBy: users.invitedBy,
+          });
+
+        logAudit({
+          userId: ctx.user.id,
+          actionType: "update",
+          entityType: "user",
+          entityId: requestUser.id,
+          fieldName: "auth.access_request_approved",
+          oldValue: JSON.stringify({ email: requestUser.email, status: "access_requested" }),
+          newValue: JSON.stringify({
+            email: requestUser.email,
+            role: request.role,
+            status: "registration_approved",
+            outcome: "approved",
+            bulk: true,
+          }),
+          ipAddress: getClientIp(ctx.req),
+          userAgent: ctx.req.headers["user-agent"] as string,
+        });
+
+        approved.push(updated);
+      }
+
+      return { success: true, count: approved.length, data: approved };
+    }),
+
+  bulkDenyAccessRequests: adminProcedure
+    .input(bulkAccessRequestDenialSchema)
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb();
+      const denied: string[] = [];
+
+      for (const requestedEmail of input.emails) {
+        const email = normalizeEmail(requestedEmail);
+        requireSuperAdminForReservedIdentity(email, ctx.user.role);
+
+        const requestUser = await getAccessRequestByEmail(email);
+        if (!requestUser) {
+          throw new TRPCError({ code: "NOT_FOUND", message: `Access request not found for ${email}` });
+        }
+
+        await db.delete(users).where(eq(users.id, requestUser.id));
+
+        logAudit({
+          userId: ctx.user.id,
+          actionType: "delete",
+          entityType: "user",
+          entityId: requestUser.id,
+          fieldName: "auth.access_request_denied",
+          oldValue: JSON.stringify({ email: requestUser.email, status: "access_requested" }),
+          newValue: JSON.stringify({ email: requestUser.email, status: "access_denied", outcome: "denied", bulk: true }),
+          ipAddress: getClientIp(ctx.req),
+          userAgent: ctx.req.headers["user-agent"] as string,
+        });
+
+        denied.push(email);
+      }
+
+      return { success: true, count: denied.length, emails: denied };
     }),
 
   addRegistrationAllowlistEmail: adminProcedure

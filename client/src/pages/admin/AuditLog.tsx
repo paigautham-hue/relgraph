@@ -16,6 +16,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -104,6 +105,14 @@ function actionBadgeClass(actionType: string, fieldName?: string | null) {
   return styles[actionType] ?? "bg-muted text-muted-foreground";
 }
 
+function outcomeFromEntry(entry: AuditRow) {
+  const parsed = parseJson(entry.newValue);
+  if (parsed && typeof parsed === "object" && "outcome" in parsed) {
+    return String((parsed as Record<string, unknown>).outcome);
+  }
+  return "-";
+}
+
 function DetailBlock({ title, value }: { title: string; value: unknown }) {
   if (value == null || value === "") return null;
 
@@ -121,6 +130,12 @@ export default function AuditLog() {
   const [page, setPage] = useState(1);
   const [actionType, setActionType] = useState<string>("all");
   const [entityType, setEntityType] = useState<string>("all");
+  const [outcome, setOutcome] = useState<string>("all");
+  const [email, setEmail] = useState("");
+  const [emailDraft, setEmailDraft] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [authOnly, setAuthOnly] = useState(true);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const pageSize = 25;
 
@@ -130,6 +145,11 @@ export default function AuditLog() {
       pageSize,
       actionType: actionType === "all" ? undefined : actionType,
       entityType: entityType === "all" ? undefined : entityType,
+      outcome: outcome === "all" ? undefined : outcome,
+      email: email || undefined,
+      startDate: startDate ? new Date(`${startDate}T00:00:00`).toISOString() : undefined,
+      endDate: endDate ? new Date(`${endDate}T23:59:59`).toISOString() : undefined,
+      authOnly,
     },
     { refetchOnWindowFocus: false },
   );
@@ -148,11 +168,28 @@ export default function AuditLog() {
     });
   };
 
+  const applyEmailFilter = () => {
+    setEmail(emailDraft.trim());
+    setPage(1);
+  };
+
+  const resetFilters = () => {
+    setActionType("all");
+    setEntityType("all");
+    setOutcome("all");
+    setEmail("");
+    setEmailDraft("");
+    setStartDate("");
+    setEndDate("");
+    setAuthOnly(true);
+    setPage(1);
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Audit Log"
-        subtitle="Review onboarding, login, and operational changes captured across the platform."
+        subtitle="Review onboarding, login, and operational changes with focused authentication filters."
       />
 
       <Card>
@@ -164,7 +201,7 @@ export default function AuditLog() {
                 System activity
               </CardTitle>
               <CardDescription>
-                Authentication events now appear alongside user and admin changes so access requests, password setup, and sign-ins can be reviewed in one place.
+                Authentication events appear alongside user and admin changes so access requests, approvals, password setup, and sign-ins can be reviewed together or filtered down to just auth activity.
               </CardDescription>
             </div>
             <Badge variant="outline" className="w-fit rounded-full px-3 py-1 text-xs">
@@ -178,11 +215,11 @@ export default function AuditLog() {
               Authentication audit trail
             </div>
             <p>
-              Look for rows labeled <strong>Access Request</strong>, <strong>Password Setup</strong>, <strong>Registration Complete</strong>, and <strong>Login</strong> to review the new onboarding flow end to end.
+              Use the filters below to isolate authentication activity by email, date range, and approval outcome. The view defaults to auth events so onboarding and login reviews stay focused.
             </p>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="grid gap-3 lg:grid-cols-5">
             <Select
               value={actionType}
               onValueChange={(value) => {
@@ -190,7 +227,7 @@ export default function AuditLog() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectTrigger>
                 <SelectValue placeholder="All actions" />
               </SelectTrigger>
               <SelectContent>
@@ -210,7 +247,7 @@ export default function AuditLog() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectTrigger>
                 <SelectValue placeholder="All entities" />
               </SelectTrigger>
               <SelectContent>
@@ -222,6 +259,74 @@ export default function AuditLog() {
                 <SelectItem value="domain">Domain</SelectItem>
               </SelectContent>
             </Select>
+
+            <Select
+              value={outcome}
+              onValueChange={(value) => {
+                setOutcome(value);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All outcomes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All outcomes</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="denied">Denied</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(event) => {
+                setStartDate(event.target.value);
+                setPage(1);
+              }}
+            />
+
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(event) => {
+                setEndDate(event.target.value);
+                setPage(1);
+              }}
+            />
+          </div>
+
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-1 gap-3">
+              <Input
+                value={emailDraft}
+                onChange={(event) => setEmailDraft(event.target.value)}
+                placeholder="Filter by email"
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    applyEmailFilter();
+                  }
+                }}
+              />
+              <Button variant="outline" onClick={applyEmailFilter}>
+                Apply email filter
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={authOnly ? "default" : "outline"}
+                className={authOnly ? "bg-[var(--relgraph-primary)] hover:bg-[var(--relgraph-primary-dark)]" : ""}
+                onClick={() => {
+                  setAuthOnly((current) => !current);
+                  setPage(1);
+                }}
+              >
+                {authOnly ? "Showing auth events only" : "Show auth events only"}
+              </Button>
+              <Button variant="outline" onClick={resetFilters}>
+                Reset filters
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -233,6 +338,7 @@ export default function AuditLog() {
                   <TableHead>Date</TableHead>
                   <TableHead>User</TableHead>
                   <TableHead>Event</TableHead>
+                  <TableHead>Outcome</TableHead>
                   <TableHead>Action</TableHead>
                   <TableHead className="hidden lg:table-cell">Entity</TableHead>
                 </TableRow>
@@ -246,17 +352,18 @@ export default function AuditLog() {
                       <TableCell><div className="flex items-center gap-2"><Skeleton className="h-8 w-8 rounded-full" /><Skeleton className="h-4 w-28" /></div></TableCell>
                       <TableCell><Skeleton className="h-4 w-28" /></TableCell>
                       <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
                       <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-28" /></TableCell>
                     </TableRow>
                   ))
                 ) : entries.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6}>
+                    <TableCell colSpan={7}>
                       <div className="flex flex-col items-center justify-center py-16 text-center">
                         <ScrollText className="mb-3 h-10 w-10 text-muted-foreground/40" />
                         <p className="text-sm font-medium">No audit entries found</p>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          Activity will appear here once users sign in, request access, or admins update records.
+                          Try broadening the filters or wait for new sign-ins, access requests, approvals, or other admin actions.
                         </p>
                       </div>
                     </TableCell>
@@ -273,6 +380,7 @@ export default function AuditLog() {
                         parsedOldValue ||
                         parsedNewValue,
                     );
+                    const outcome = outcomeFromEntry(entry);
 
                     return (
                       <Collapsible
@@ -295,7 +403,7 @@ export default function AuditLog() {
                                 {formatDate(entry.createdAt)}
                               </TableCell>
                               <TableCell>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-3">
                                   <AvatarInitials name={entry.userName || entry.userEmail || "S"} size="sm" />
                                   <div className="min-w-0">
                                     <p className="truncate text-sm font-medium">{entry.userName || "System"}</p>
@@ -303,15 +411,18 @@ export default function AuditLog() {
                                   </div>
                                 </div>
                               </TableCell>
-                              <TableCell className="text-sm font-medium">
-                                {prettifyLabel(entry.fieldName)}
+                              <TableCell className="text-sm font-medium">{prettifyLabel(entry.fieldName)}</TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className="capitalize">
+                                  {outcome}
+                                </Badge>
                               </TableCell>
                               <TableCell>
                                 <Badge className={actionBadgeClass(entry.actionType, entry.fieldName)}>
                                   {entry.actionType}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="hidden lg:table-cell text-sm text-muted-foreground capitalize">
+                              <TableCell className="hidden text-sm text-muted-foreground capitalize lg:table-cell">
                                 {entry.entityType}
                               </TableCell>
                             </TableRow>
@@ -319,7 +430,7 @@ export default function AuditLog() {
                           {hasDetails ? (
                             <CollapsibleContent asChild>
                               <tr>
-                                <td colSpan={6} className="px-6 pb-4">
+                                <td colSpan={7} className="px-6 pb-4">
                                   <div className="grid gap-3 rounded-xl bg-muted/20 p-4 md:grid-cols-2">
                                     <DetailBlock title="Event field" value={entry.fieldName} />
                                     <DetailBlock title="Entity ID" value={entry.entityId} />

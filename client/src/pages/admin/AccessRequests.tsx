@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -26,8 +27,15 @@ import { CheckCircle2, Mail, ShieldCheck, XCircle } from "lucide-react";
 const roleOptions = ["viewer", "contributor", "manager", "admin", "super_admin"] as const;
 
 type RoleOption = (typeof roleOptions)[number];
-
 type RequestRoleState = Record<string, RoleOption>;
+
+type AccessRequestRow = {
+  id: string;
+  email: string;
+  name: string | null;
+  role: string | null;
+  createdAt: string | Date | null;
+};
 
 const roleColors: Record<RoleOption, string> = {
   super_admin: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
@@ -44,6 +52,7 @@ function RoleBadge({ role }: { role: RoleOption }) {
 export default function AccessRequestsPage() {
   const utils = trpc.useUtils();
   const [selectedRoles, setSelectedRoles] = useState<RequestRoleState>({});
+  const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
 
   const meQuery = trpc.auth.me.useQuery(undefined, { refetchOnWindowFocus: false });
   const accessRequestsQuery = trpc.admin.listAccessRequests.useQuery(undefined, {
@@ -57,6 +66,22 @@ export default function AccessRequestsPage() {
     [canManageSuperAdmin],
   );
 
+  const accessRequests = useMemo(
+    () => ((accessRequestsQuery.data as any[]) ?? []) as AccessRequestRow[],
+    [accessRequestsQuery.data],
+  );
+
+  const selectableEmails = useMemo(
+    () =>
+      accessRequests
+        .filter((request) => request.email !== "gautham@manipalgroup.info" || canManageSuperAdmin)
+        .map((request) => request.email),
+    [accessRequests, canManageSuperAdmin],
+  );
+
+  const allSelected = selectableEmails.length > 0 && selectableEmails.every((email) => selectedEmails.includes(email));
+  const someSelected = selectedEmails.length > 0;
+
   const invalidateViews = async () => {
     await Promise.all([
       utils.admin.listAccessRequests.invalidate(),
@@ -64,6 +89,10 @@ export default function AccessRequestsPage() {
       utils.admin.listUsers.invalidate(),
       utils.audit.list.invalidate(),
     ]);
+  };
+
+  const clearResolvedSelections = () => {
+    setSelectedEmails((current) => current.filter((email) => selectableEmails.includes(email)));
   };
 
   const approveAccessRequestMutation = trpc.admin.approveAccessRequest.useMutation({
@@ -74,6 +103,7 @@ export default function AccessRequestsPage() {
         delete next[variables.email];
         return next;
       });
+      setSelectedEmails((prev) => prev.filter((email) => email !== variables.email));
       await invalidateViews();
     },
     onError: (err) => {
@@ -89,6 +119,7 @@ export default function AccessRequestsPage() {
         delete next[variables.email];
         return next;
       });
+      setSelectedEmails((prev) => prev.filter((email) => email !== variables.email));
       await invalidateViews();
     },
     onError: (err) => {
@@ -96,18 +127,84 @@ export default function AccessRequestsPage() {
     },
   });
 
-  const accessRequests = (accessRequestsQuery.data as any[]) ?? [];
+  const bulkApproveMutation = trpc.admin.bulkApproveAccessRequests.useMutation({
+    onSuccess: async (result) => {
+      toast.success(`Approved ${result.count} access request${result.count === 1 ? "" : "s"}.`);
+      setSelectedEmails([]);
+      setSelectedRoles((prev) => {
+        const next = { ...prev };
+        for (const email of selectableEmails) {
+          if (!selectedEmails.includes(email)) continue;
+          delete next[email];
+        }
+        return next;
+      });
+      await invalidateViews();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to bulk approve access requests");
+    },
+  });
+
+  const bulkDenyMutation = trpc.admin.bulkDenyAccessRequests.useMutation({
+    onSuccess: async (result) => {
+      toast.success(`Denied ${result.count} access request${result.count === 1 ? "" : "s"}.`);
+      setSelectedEmails([]);
+      setSelectedRoles((prev) => {
+        const next = { ...prev };
+        for (const email of result.emails) {
+          delete next[email];
+        }
+        return next;
+      });
+      await invalidateViews();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to bulk deny access requests");
+    },
+  });
+
+  const isBusy =
+    approveAccessRequestMutation.isPending ||
+    denyAccessRequestMutation.isPending ||
+    bulkApproveMutation.isPending ||
+    bulkDenyMutation.isPending;
+
+  const toggleSelection = (email: string, checked: boolean) => {
+    setSelectedEmails((current) => {
+      if (checked) {
+        return current.includes(email) ? current : [...current, email];
+      }
+      return current.filter((value) => value !== email);
+    });
+  };
+
+  const toggleSelectAll = (checked: boolean) => {
+    setSelectedEmails(checked ? selectableEmails : []);
+  };
+
+  const handleBulkApprove = () => {
+    const requests = selectedEmails.map((email) => ({
+      email,
+      role: (selectedRoles[email] ?? "viewer") as RoleOption,
+    }));
+    bulkApproveMutation.mutate({ requests } as any);
+  };
+
+  const handleBulkDeny = () => {
+    bulkDenyMutation.mutate({ emails: selectedEmails } as any);
+  };
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Access Requests"
-        subtitle="Review incoming onboarding requests and approve the right role before password setup."
+        subtitle="Review incoming onboarding requests, assign roles, and process approvals individually or in bulk."
       />
 
       <Card>
         <CardHeader className="space-y-3">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Mail className="h-5 w-5 text-[var(--relgraph-primary)]" />
@@ -117,9 +214,14 @@ export default function AccessRequestsPage() {
                 Approving a request moves the user into the password-setup state. Denying a request removes the pending record.
               </CardDescription>
             </div>
-            <Badge variant="outline" className="rounded-full px-3 py-1 text-xs">
-              {accessRequestsQuery.isLoading ? "Loading" : `${accessRequests.length} pending`}
-            </Badge>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="rounded-full px-3 py-1 text-xs">
+                {accessRequestsQuery.isLoading ? "Loading" : `${accessRequests.length} pending`}
+              </Badge>
+              <Badge variant="secondary" className="rounded-full px-3 py-1 text-xs">
+                {`${selectedEmails.length} selected`}
+              </Badge>
+            </div>
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
@@ -129,7 +231,7 @@ export default function AccessRequestsPage() {
                 Approval flow
               </div>
               <p>
-                Choose the role before approval. Once approved, the user can complete registration from the login page using the <strong>Register</strong> or <strong>Set password</strong> tab.
+                Choose roles before approval. Bulk actions reuse the currently selected role for each checked request, so admins can process a queue quickly without opening each row one by one.
               </p>
             </div>
             <div className="rounded-xl border bg-muted/30 p-4 text-sm text-muted-foreground">
@@ -138,12 +240,51 @@ export default function AccessRequestsPage() {
               </p>
             </div>
           </div>
+
+          <div className="flex flex-col gap-3 rounded-xl border bg-muted/20 p-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-sm font-medium">Bulk actions</p>
+              <p className="text-sm text-muted-foreground">
+                Select one or more requests, confirm the role shown in each row, and then approve or deny them together.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!someSelected || isBusy}
+                onClick={handleBulkDeny}
+              >
+                <XCircle className="mr-2 h-4 w-4" />
+                Deny selected
+              </Button>
+              <Button
+                size="sm"
+                className="bg-[var(--relgraph-primary)] hover:bg-[var(--relgraph-primary-dark)]"
+                disabled={!someSelected || isBusy}
+                onClick={handleBulkApprove}
+              >
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Approve selected
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="rounded-xl border">
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[48px]">
+                    <div className="flex items-center justify-center">
+                      <Checkbox
+                        checked={allSelected}
+                        onCheckedChange={(checked) => toggleSelectAll(Boolean(checked))}
+                        aria-label="Select all access requests"
+                        disabled={selectableEmails.length === 0 || isBusy}
+                      />
+                    </div>
+                  </TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Requested on</TableHead>
@@ -155,6 +296,7 @@ export default function AccessRequestsPage() {
                 {accessRequestsQuery.isLoading ? (
                   Array.from({ length: 4 }).map((_, index) => (
                     <TableRow key={index}>
+                      <TableCell><Skeleton className="mx-auto h-4 w-4" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-28" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-48" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-28" /></TableCell>
@@ -164,7 +306,7 @@ export default function AccessRequestsPage() {
                   ))
                 ) : accessRequests.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5}>
+                    <TableCell colSpan={6}>
                       <div className="flex flex-col items-center justify-center py-14 text-center">
                         <Mail className="mb-3 h-10 w-10 text-muted-foreground/40" />
                         <p className="text-sm font-medium">No pending access requests</p>
@@ -175,19 +317,31 @@ export default function AccessRequestsPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  accessRequests.map((request: any) => {
+                  accessRequests.map((request) => {
                     const protectedRequest =
                       request.email === "gautham@manipalgroup.info" && !canManageSuperAdmin;
                     const selectedRole = (selectedRoles[request.email] ?? "viewer") as RoleOption;
-                    const isBusy = approveAccessRequestMutation.isPending || denyAccessRequestMutation.isPending;
+                    const checked = selectedEmails.includes(request.email);
 
                     return (
                       <TableRow key={request.id}>
                         <TableCell>
+                          <div className="flex items-center justify-center">
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={(value) => toggleSelection(request.email, Boolean(value))}
+                              aria-label={`Select ${request.email}`}
+                              disabled={protectedRequest || isBusy}
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell>
                           <div className="space-y-1">
                             <p className="font-medium">{request.name || "Pending user"}</p>
                             {protectedRequest ? (
-                              <p className="text-xs text-muted-foreground">Reserved account approval requires super-admin access.</p>
+                              <p className="text-xs text-muted-foreground">
+                                Reserved account approval requires super-admin access.
+                              </p>
                             ) : null}
                           </div>
                         </TableCell>
@@ -205,7 +359,7 @@ export default function AccessRequestsPage() {
                                   [request.email]: value as RoleOption,
                                 }))
                               }
-                              disabled={protectedRequest}
+                              disabled={protectedRequest || isBusy}
                             >
                               <SelectTrigger className="h-9 w-40">
                                 <SelectValue />

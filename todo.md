@@ -29,3 +29,6 @@
 - [x] Add an admin screen for reviewing and approving access requests
 - [x] Add inline success and error feedback on the Set password form
 - [x] Add a lightweight audit log for onboarding and login events
+- [x] Add bulk approve and reject actions for access requests
+- [ ] Send an email notification when an access request is approved (deferred until the email API is added later)
+- [x] Add audit-log filters for authentication events by email, date range, and outcome
