@@ -1,48 +1,90 @@
+import { useState, useEffect, useCallback } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import DashboardLayout from "./components/DashboardLayout";
+import LoginPage from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
+import PersonList from "./pages/PersonList";
+import PersonProfile from "./pages/PersonProfile";
+import UserManagement from "./pages/admin/UserManagement";
+import DomainManagement from "./pages/admin/DomainManagement";
+import AuditLog from "./pages/admin/AuditLog";
+import NetworkMap from "./pages/NetworkMap";
+import PathFinder from "./pages/PathFinder";
+import AlertsPage from "./pages/AlertsPage";
+import BriefingsPage from "./pages/BriefingsPage";
+import OrganizationList from "./pages/OrganizationList";
+import { QuickLogModal } from "./components/input/QuickLogModal";
+import ChatPanel from "./components/chat/ChatPanel";
 
-function HomeRoute() {
+function AppRoutes() {
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <div className="container flex min-h-screen items-center justify-center py-16">
-        <div className="w-full max-w-3xl rounded-3xl border border-border bg-card px-8 py-12 text-center shadow-sm">
-          <p className="text-sm font-medium uppercase tracking-[0.24em] text-muted-foreground">
-            RelGraph Starter Template
-          </p>
-          <h1 className="mt-4 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-            RelGraph
-          </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
-            Relationship Intelligence Platform starter scaffold built with React 19, Vite 7,
-            TypeScript, Tailwind CSS 4, Wouter, Express, Drizzle, and Manus runtime integration.
-          </p>
-        </div>
-      </div>
-    </main>
+    <DashboardLayout>
+      <Switch>
+        <Route path="/" component={Dashboard} />
+        <Route path="/persons" component={PersonList} />
+        <Route path="/organizations" component={OrganizationList} />
+        <Route path="/persons/:id" component={PersonProfile} />
+        <Route path="/network" component={NetworkMap} />
+        <Route path="/paths" component={PathFinder} />
+        <Route path="/alerts" component={AlertsPage} />
+        <Route path="/briefings" component={BriefingsPage} />
+        <Route path="/admin/users" component={UserManagement} />
+        <Route path="/admin/domains" component={DomainManagement} />
+        <Route path="/admin/audit" component={AuditLog} />
+        <Route>
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <p className="text-lg font-medium">Page not found</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              The page you are looking for does not exist.
+            </p>
+          </div>
+        </Route>
+      </Switch>
+    </DashboardLayout>
   );
 }
 
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={HomeRoute} />
+      <Route path="/login" component={LoginPage} />
       <Route>
-        <HomeRoute />
+        <AppRoutes />
       </Route>
     </Switch>
   );
 }
 
 export default function App() {
+  const [quickLogOpen, setQuickLogOpen] = useState(false);
+
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "l") {
+        e.preventDefault();
+        setQuickLogOpen((prev) => !prev);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
+
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
           <Router />
+          <ChatPanel />
+          <QuickLogModal open={quickLogOpen} onOpenChange={setQuickLogOpen} />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

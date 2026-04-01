@@ -1,28 +1,44 @@
-import { COOKIE_NAME } from "@shared/const";
-import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router } from "./_core/trpc";
+import { router } from "./_core/trpc";
+import { authRouter } from "./routers/auth.router";
+import { personsRouter } from "./routers/persons.router";
+import { organizationsRouter } from "./routers/organizations.router";
+import { tenuresRouter } from "./routers/tenures.router";
+import { relationshipsRouter } from "./routers/relationships.router";
+import { interactionsRouter } from "./routers/interactions.router";
+import { reflectionsRouter } from "./routers/reflections.router";
+import { intelRouter } from "./routers/intel.router";
+import { notesRouter } from "./routers/notes.router";
+import { domainsRouter } from "./routers/domains.router";
+import { adminRouter } from "./routers/admin.router";
+import { auditRouter } from "./routers/audit.router";
+import { dashboardRouter } from "./routers/dashboard.router";
+import { voiceRouter } from "./routers/voice.router";
+import { searchRouter } from "./routers/search.router";
+import { chatRouter } from "./routers/chat.router";
+import { briefingsRouter } from "./routers/briefings.router";
+import { alertsRouter } from "./routers/alerts.router";
 
 export const appRouter = router({
-    // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
-  auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
-    logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return {
-        success: true,
-      } as const;
-    }),
-  }),
-
-  // TODO: add feature routers here, e.g.
-  // todo: router({
-  //   list: protectedProcedure.query(({ ctx }) =>
-  //     db.getUserTodos(ctx.user.id)
-  //   ),
-  // }),
+  auth: authRouter,
+  persons: personsRouter,
+  organizations: organizationsRouter,
+  tenures: tenuresRouter,
+  relationships: relationshipsRouter,
+  interactions: interactionsRouter,
+  reflections: reflectionsRouter,
+  intel: intelRouter,
+  notes: notesRouter,
+  domains: domainsRouter,
+  admin: adminRouter,
+  audit: auditRouter,
+  dashboard: dashboardRouter,
+  voice: voiceRouter,
+  search: searchRouter,
+  chat: chatRouter,
+  briefings: briefingsRouter,
+  alerts: alertsRouter,
 });
 
 export type AppRouter = typeof appRouter;

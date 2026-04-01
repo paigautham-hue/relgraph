@@ -1,6 +1,6 @@
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import type { Express, Request, Response } from "express";
-import * as db from "../db";
+import { getUserByOpenId, createUser } from "../services/auth.service";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
 
@@ -28,13 +28,17 @@ export function registerOAuthRoutes(app: Express) {
         return;
       }
 
-      await db.upsertUser({
-        openId: userInfo.openId,
-        name: userInfo.name || null,
-        email: userInfo.email ?? null,
-        loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
-        lastSignedIn: new Date(),
-      });
+      // Find or create user
+      let user = await getUserByOpenId(userInfo.openId);
+      if (!user) {
+        user = await createUser({
+          email: userInfo.email || `${userInfo.openId}@manus.local`,
+          name: userInfo.name || "Manus User",
+          openId: userInfo.openId,
+          loginMethod: userInfo.loginMethod ?? userInfo.platform ?? "manus_oauth",
+          role: "viewer",
+        });
+      }
 
       const sessionToken = await sdk.createSessionToken(userInfo.openId, {
         name: userInfo.name || "",
