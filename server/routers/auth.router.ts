@@ -1,7 +1,13 @@
 import { eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure, protectedProcedure } from "../_core/trpc";
-import { loginSchema, changePasswordSchema, registerSchema } from "@shared/validation";
+import {
+  loginSchema,
+  changePasswordSchema,
+  registerSchema,
+  requestAccessSchema,
+  setupPasswordSchema,
+} from "@shared/validation";
 import { RELGRAPH_SESSION_COOKIE, RELGRAPH_REFRESH_COOKIE } from "@shared/constants";
 import {
   loginUser,
@@ -16,12 +22,17 @@ import {
   normalizeEmail,
   createUser,
   RESERVED_SUPER_ADMIN_EMAIL,
+  ACCESS_REQUEST_LOGIN_METHOD,
+  getAccessRequestByEmail,
 } from "../services/auth.service";
 import { getDb } from "../db";
 import { users } from "../db/schema";
 import { getSessionCookieOptions } from "../_core/cookies";
 
-async function issueSessionCookies(ctx: { req: any; res: any }, user: { id: string; email: string; role: string; name: string }) {
+async function issueSessionCookies(
+  ctx: { req: any; res: any },
+  user: { id: string; email: string; role: string; name: string },
+) {
   const [accessToken, refreshToken] = await Promise.all([
     generateAccessToken({
       userId: user.id,
@@ -46,6 +57,75 @@ async function issueSessionCookies(ctx: { req: any; res: any }, user: { id: stri
     ...cookieOptions,
     maxAge: 604_800_000,
   });
+}
+
+async function finalizePasswordSetup(
+  ctx: { req: any; res: any },
+  input: { email: string; name: string; password: string },
+) {
+  const db = getDb();
+  const email = normalizeEmail(input.email);
+  const approved = await isEmailApprovedForRegistration(email);
+
+  if (!approved) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "This email has not been approved for registration yet. Please ask an admin to add it first.",
+    });
+  }
+
+  let user = await getUserByEmail(email);
+
+  if (user && user.passwordHash && user.loginMethod !== "allowlist_pending") {
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: "An account with this email already exists. Please sign in instead.",
+    });
+  }
+
+  const passwordHash = await hashPassword(input.password);
+
+  if (user) {
+    const [updatedUser] = await db
+      .update(users)
+      .set({
+        name: input.name.trim(),
+        passwordHash,
+        loginMethod: "password",
+        isActive: true,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, user.id))
+      .returning();
+
+    user = updatedUser ?? user;
+  } else {
+    user = await createUser({
+      email,
+      name: input.name.trim(),
+      password: input.password,
+      role: email === RESERVED_SUPER_ADMIN_EMAIL ? "super_admin" : "viewer",
+      loginMethod: "password",
+      isActive: true,
+    });
+  }
+
+  await issueSessionCookies(ctx, {
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    name: user.name,
+  });
+
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      avatarUrl: user.avatarUrl,
+    },
+  };
 }
 
 export const authRouter = router({
@@ -76,70 +156,60 @@ export const authRouter = router({
     };
   }),
 
-  register: publicProcedure.input(registerSchema).mutation(async ({ input, ctx }) => {
-    const db = getDb();
+  requestAccess: publicProcedure.input(requestAccessSchema).mutation(async ({ input }) => {
     const email = normalizeEmail(input.email);
-    const approved = await isEmailApprovedForRegistration(email);
 
-    if (!approved) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "This email has not been approved for registration yet. Please ask an admin to add it first.",
-      });
+    if (email === RESERVED_SUPER_ADMIN_EMAIL) {
+      return {
+        status: "approved" as const,
+        message: "This reserved super-admin account can go directly to first-time password setup.",
+      };
     }
 
-    let user = await getUserByEmail(email);
+    const approved = await isEmailApprovedForRegistration(email);
+    if (approved) {
+      return {
+        status: "approved" as const,
+        message: "This email is already approved. You can continue to create your password.",
+      };
+    }
 
-    if (user && user.passwordHash && user.loginMethod !== "allowlist_pending") {
+    const existingUser = await getUserByEmail(email);
+    if (existingUser && existingUser.passwordHash) {
       throw new TRPCError({
         code: "CONFLICT",
         message: "An account with this email already exists. Please sign in instead.",
       });
     }
 
-    const passwordHash = await hashPassword(input.password);
-
-    if (user) {
-      const [updatedUser] = await db
-        .update(users)
-        .set({
-          name: input.name.trim(),
-          passwordHash,
-          loginMethod: "password",
-          isActive: true,
-          updatedAt: new Date(),
-        })
-        .where(eq(users.id, user.id))
-        .returning();
-
-      user = updatedUser ?? user;
-    } else {
-      user = await createUser({
-        email,
-        name: input.name.trim(),
-        password: input.password,
-        role: email === RESERVED_SUPER_ADMIN_EMAIL ? "super_admin" : "viewer",
-        loginMethod: "password",
-        isActive: true,
-      });
+    const existingRequest = await getAccessRequestByEmail(email);
+    if (existingRequest) {
+      return {
+        status: "pending" as const,
+        message: "Your access request is already pending admin review.",
+      };
     }
 
-    await issueSessionCookies(ctx, {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      name: user.name,
+    await createUser({
+      email,
+      name: input.name?.trim() || email,
+      role: "viewer",
+      loginMethod: ACCESS_REQUEST_LOGIN_METHOD,
+      isActive: false,
     });
 
     return {
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        avatarUrl: user.avatarUrl,
-      },
+      status: "requested" as const,
+      message: "Your access request has been submitted for admin review.",
     };
+  }),
+
+  register: publicProcedure.input(registerSchema).mutation(async ({ input, ctx }) => {
+    return finalizePasswordSetup(ctx, input);
+  }),
+
+  setupPassword: publicProcedure.input(setupPasswordSchema).mutation(async ({ input, ctx }) => {
+    return finalizePasswordSetup(ctx, input);
   }),
 
   me: protectedProcedure.query(({ ctx }) => {

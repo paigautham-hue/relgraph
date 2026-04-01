@@ -24,6 +24,18 @@ export const registerSchema = z.object({
   password: z.string().min(PASSWORD_MIN_LENGTH),
 });
 
+export const requestAccessSchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(1).max(255).optional(),
+  note: z.string().max(1000).optional(),
+});
+
+export const setupPasswordSchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(1).max(255),
+  password: z.string().min(PASSWORD_MIN_LENGTH),
+});
+
 // Pagination
 export const paginationSchema = z.object({
   page: z.number().int().min(1).default(1),

@@ -38,6 +38,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Loader2,
@@ -46,6 +47,7 @@ import {
   Trash2,
   UserPlus,
   Users,
+  XCircle,
 } from "lucide-react";
 
 const roleOptions = ["viewer", "contributor", "manager", "admin", "super_admin"] as const;
@@ -96,6 +98,9 @@ export default function UserManagement() {
   const allowlistQuery = trpc.admin.listRegistrationAllowlist.useQuery(undefined, {
     refetchOnWindowFocus: false,
   });
+  const accessRequestsQuery = trpc.admin.listAccessRequests.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
 
   const currentUserRole = meQuery.data?.role ?? "viewer";
   const canManageSuperAdmin = currentUserRole === "super_admin";
@@ -118,6 +123,7 @@ export default function UserManagement() {
     await Promise.all([
       utils.admin.listUsers.invalidate(),
       utils.admin.listRegistrationAllowlist.invalidate(),
+      utils.admin.listAccessRequests.invalidate(),
       utils.auth.me.invalidate(),
     ]);
   };
@@ -155,6 +161,26 @@ export default function UserManagement() {
     },
   });
 
+  const approveAccessRequestMutation = trpc.admin.approveAccessRequest.useMutation({
+    onSuccess: async () => {
+      toast.success("Access request approved. The user can now create a password.");
+      await invalidateAdminViews();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to approve access request");
+    },
+  });
+
+  const denyAccessRequestMutation = trpc.admin.denyAccessRequest.useMutation({
+    onSuccess: async () => {
+      toast.success("Access request denied");
+      await invalidateAdminViews();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to deny access request");
+    },
+  });
+
   const updateMutation = trpc.admin.updateUser.useMutation({
     onSuccess: async () => {
       toast.success("User updated");
@@ -189,6 +215,7 @@ export default function UserManagement() {
   const total = (usersQuery.data as any)?.total ?? 0;
   const loading = usersQuery.isLoading;
   const allowlistedEmails = (allowlistQuery.data as any[]) ?? [];
+  const accessRequests = (accessRequestsQuery.data as any[]) ?? [];
 
   return (
     <div className="space-y-6">
@@ -266,6 +293,7 @@ export default function UserManagement() {
         <TabsList>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="allowlist">Registration Allowlist</TabsTrigger>
+          <TabsTrigger value="requests">Access Requests</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users" className="space-y-6">
@@ -465,6 +493,107 @@ export default function UserManagement() {
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 Remove
                               </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="requests" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="h-5 w-5 text-[var(--relgraph-primary)]" />
+                Pending access requests
+              </CardTitle>
+              <CardDescription>
+                Review incoming requests from users who do not yet have approval. Approving a request moves the email into the registration allowlist so the user can set their password.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Requested on</TableHead>
+                      <TableHead>Approve as</TableHead>
+                      <TableHead className="w-[220px] text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {accessRequestsQuery.isLoading ? (
+                      Array.from({ length: 3 }).map((_, index) => (
+                        <TableRow key={index}>
+                          <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                          <TableCell><Skeleton className="h-8 w-28" /></TableCell>
+                          <TableCell><Skeleton className="ml-auto h-8 w-40" /></TableCell>
+                        </TableRow>
+                      ))
+                    ) : accessRequests.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5}>
+                          <div className="py-10 text-center text-sm text-muted-foreground">
+                            No pending access requests.
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      accessRequests.map((request: any) => {
+                        const protectedRequest = request.email === "gautham@manipalgroup.info" && !canManageSuperAdmin;
+                        const defaultRole = protectedRequest ? "viewer" : "viewer";
+                        const assignableRequestRoles = canManageSuperAdmin ? roleOptions : roleOptions.filter((role) => role !== "super_admin");
+                        return (
+                          <TableRow key={request.id}>
+                            <TableCell className="font-medium">{request.name || "-"}</TableCell>
+                            <TableCell>{request.email}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {request.createdAt ? new Date(request.createdAt).toLocaleString() : "-"}
+                            </TableCell>
+                            <TableCell>
+                              <Select defaultValue={defaultRole} onValueChange={(value) => { (request.__selectedRole = value); }}>
+                                <SelectTrigger className="h-8 w-36">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {assignableRequestRoles.map((role) => (
+                                    <SelectItem key={role} value={role}>
+                                      {role.replaceAll("_", " ")}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={denyAccessRequestMutation.isPending || protectedRequest}
+                                  onClick={() => denyAccessRequestMutation.mutate({ email: request.email } as any)}
+                                >
+                                  <XCircle className="mr-2 h-4 w-4" />
+                                  Deny
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className="bg-[var(--relgraph-primary)] hover:bg-[var(--relgraph-primary-dark)]"
+                                  disabled={approveAccessRequestMutation.isPending}
+                                  onClick={() => approveAccessRequestMutation.mutate({ email: request.email, role: (request.__selectedRole || defaultRole) } as any)}
+                                >
+                                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                                  Approve
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         );

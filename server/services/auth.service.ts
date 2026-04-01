@@ -10,6 +10,7 @@ import { ROLE_LEVELS } from "../../shared/enums";
 const SALT_ROUNDS = 12;
 const RESERVED_SUPER_ADMIN_EMAIL = "gautham@manipalgroup.info";
 const PENDING_ALLOWLIST_LOGIN_METHOD = "allowlist_pending";
+const ACCESS_REQUEST_LOGIN_METHOD = "access_request";
 
 const getSecret = (key: string) => new TextEncoder().encode(key);
 
@@ -187,6 +188,22 @@ export async function getPendingRegistrationByEmail(email: string): Promise<User
   return user ? syncReservedRole(user) : null;
 }
 
+export async function getAccessRequestByEmail(email: string): Promise<User | null> {
+  const db = getDb();
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(
+      and(
+        eq(users.email, normalizeEmail(email)),
+        eq(users.loginMethod, ACCESS_REQUEST_LOGIN_METHOD),
+      ),
+    )
+    .limit(1);
+
+  return user ? syncReservedRole(user) : null;
+}
+
 export async function isEmailApprovedForRegistration(email: string): Promise<boolean> {
   if (isReservedSuperAdminEmail(email)) {
     return true;
@@ -227,4 +244,4 @@ export async function createUser(data: {
   return syncReservedRole(user);
 }
 
-export { PENDING_ALLOWLIST_LOGIN_METHOD, RESERVED_SUPER_ADMIN_EMAIL };
+export { ACCESS_REQUEST_LOGIN_METHOD, PENDING_ALLOWLIST_LOGIN_METHOD, RESERVED_SUPER_ADMIN_EMAIL };

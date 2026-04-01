@@ -17,3 +17,7 @@
 - [x] Make gautham@manipalgroup.info the super admin in the RelGraph authorization model
 - [x] Restrict user registration so only pre-approved email addresses added by admins or super admins can register
 - [x] Limit allowlist management capabilities to admin and super admin roles only
+- [x] Add a request-access flow so unapproved users can submit their email for admin review
+- [x] Add an allowlist-aware registration page so approved users can create their own password
+- [x] Add a first-time password setup path for approved users, including the super admin account gautham@manipalgroup.info
+- [x] Update the login page UX to make sign-in, registration, and first-time setup options clear

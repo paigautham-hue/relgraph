@@ -12,7 +12,9 @@ import {
 import { getDb } from "../db";
 import { users, userDomainAccess } from "../db/schema";
 import {
+  ACCESS_REQUEST_LOGIN_METHOD,
   createUser,
+  getAccessRequestByEmail,
   getPendingRegistrationByEmail,
   hashPassword,
   normalizeEmail,
@@ -136,6 +138,95 @@ export const adminRouter = router({
 
     return rows;
   }),
+
+  listAccessRequests: adminProcedure.query(async () => {
+    const db = getDb();
+    const rows = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        name: users.name,
+        role: users.role,
+        createdAt: users.createdAt,
+      })
+      .from(users)
+      .where(eq(users.loginMethod, ACCESS_REQUEST_LOGIN_METHOD))
+      .orderBy(desc(users.createdAt));
+
+    return rows;
+  }),
+
+  approveAccessRequest: adminProcedure
+    .input(allowlistEmailSchema)
+    .mutation(async ({ input, ctx }) => {
+      const email = normalizeEmail(input.email);
+      requireSuperAdminForReservedIdentity(email, ctx.user.role);
+      requireSuperAdminForSuperAdminRole(input.role, ctx.user.role);
+
+      const db = getDb();
+      const requestUser = await getAccessRequestByEmail(email);
+      if (!requestUser) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Access request not found" });
+      }
+
+      const [updated] = await db
+        .update(users)
+        .set({
+          role: input.role as any,
+          invitedBy: ctx.user.id,
+          loginMethod: PENDING_ALLOWLIST_LOGIN_METHOD,
+          isActive: true,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, requestUser.id))
+        .returning({
+          id: users.id,
+          email: users.email,
+          role: users.role,
+          invitedBy: users.invitedBy,
+        });
+
+      logAudit({
+        userId: ctx.user.id,
+        actionType: "update",
+        entityType: "user",
+        entityId: requestUser.id,
+        oldValue: JSON.stringify({ email: requestUser.email, status: "access_requested" }),
+        newValue: JSON.stringify({ email: requestUser.email, role: input.role, status: "registration_approved" }),
+        ipAddress: getClientIp(ctx.req),
+        userAgent: ctx.req.headers["user-agent"] as string,
+      });
+
+      return updated;
+    }),
+
+  denyAccessRequest: adminProcedure
+    .input(removeAllowlistEmailSchema)
+    .mutation(async ({ input, ctx }) => {
+      const email = normalizeEmail(input.email);
+      requireSuperAdminForReservedIdentity(email, ctx.user.role);
+
+      const db = getDb();
+      const requestUser = await getAccessRequestByEmail(email);
+      if (!requestUser) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Access request not found" });
+      }
+
+      await db.delete(users).where(eq(users.id, requestUser.id));
+
+      logAudit({
+        userId: ctx.user.id,
+        actionType: "delete",
+        entityType: "user",
+        entityId: requestUser.id,
+        oldValue: JSON.stringify({ email: requestUser.email, status: "access_requested" }),
+        newValue: JSON.stringify({ status: "access_denied" }),
+        ipAddress: getClientIp(ctx.req),
+        userAgent: ctx.req.headers["user-agent"] as string,
+      });
+
+      return { success: true };
+    }),
 
   addRegistrationAllowlistEmail: adminProcedure
     .input(allowlistEmailSchema)
