@@ -32,3 +32,7 @@
 - [x] Add bulk approve and reject actions for access requests
 - [ ] Send an email notification when an access request is approved (deferred until the email API is added later)
 - [x] Add audit-log filters for authentication events by email, date range, and outcome
+- [x] Add a permission-gated bulk contact import feature for allowed users
+- [x] Add downloadable Excel and CSV contact import templates with strict required columns
+- [x] Add AI-assisted pre-import validation to catch field mismatches and unsafe rows before creating contacts
+- [x] Add a polished contact import UI with preview, errors, and confirmation flow

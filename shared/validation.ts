@@ -6,6 +6,11 @@ import {
   EXTERNAL_CONNECTION_SOURCES, ORG_HIERARCHY_TYPES,
 } from './enums';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, PASSWORD_MIN_LENGTH } from './constants';
+import {
+  CONTACT_IMPORT_HEADERS,
+  CONTACT_IMPORT_MAX_ROWS,
+  CONTACT_IMPORT_TEMPLATE_VERSION,
+} from './contactImport';
 
 // Auth
 export const loginSchema = z.object({
@@ -225,6 +230,45 @@ export const bulkAccessRequestApprovalSchema = z.object({
 
 export const bulkAccessRequestDenialSchema = z.object({
   emails: z.array(z.string().email()).min(1),
+});
+
+// Contact import
+export const contactImportSourceSchema = z.enum(['csv', 'xlsx', 'xls']);
+
+export const contactImportRowSchema = z.object({
+  rowNumber: z.number().int().min(2),
+  name: z.string().max(255).optional(),
+  currentTitle: z.string().max(255).optional(),
+  organizationName: z.string().max(255).optional(),
+  domainName: z.string().max(255).optional(),
+  category: z.enum(PERSON_CATEGORIES).optional(),
+  isTracked: z.union([z.boolean(), z.string(), z.number()]).optional(),
+  photoUrl: z.string().optional(),
+});
+
+export const validateContactImportSchema = z.object({
+  fileName: z.string().min(1).max(255),
+  source: contactImportSourceSchema,
+  templateVersion: z.string().min(1).default(CONTACT_IMPORT_TEMPLATE_VERSION),
+  headers: z.array(z.string()).min(1).max(CONTACT_IMPORT_HEADERS.length + 5),
+  rows: z.array(contactImportRowSchema).min(1).max(CONTACT_IMPORT_MAX_ROWS),
+});
+
+export const commitContactImportSchema = z.object({
+  fileName: z.string().min(1).max(255),
+  templateVersion: z.string().min(1),
+  rows: z.array(
+    z.object({
+      rowNumber: z.number().int().min(2),
+      name: z.string().min(1).max(255),
+      currentTitle: z.string().max(255).optional(),
+      organizationId: z.string().uuid().nullable().optional(),
+      category: z.enum(PERSON_CATEGORIES).optional(),
+      isTracked: z.boolean(),
+      photoUrl: z.string().url().optional(),
+    }),
+  ).min(1).max(CONTACT_IMPORT_MAX_ROWS),
+  validationDigest: z.string().min(8),
 });
 
 // Domain
