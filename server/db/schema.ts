@@ -73,6 +73,9 @@ export const auditEntityTypeEnum = pgEnum('audit_entity_type', AUDIT_ENTITY_TYPE
 export const alertTypeEnum = pgEnum('alert_type', ALERT_TYPES);
 export const alertSeverityEnum = pgEnum('alert_severity', ALERT_SEVERITIES);
 export const chatRoleEnum = pgEnum('chat_role', CHAT_ROLES);
+export const bankLeadershipRoleEnum = pgEnum('bank_leadership_role', ['chairman', 'managing_director', 'chairman_and_managing_director', 'executive_director', 'other']);
+export const bankLeadershipSourceTypeEnum = pgEnum('bank_leadership_source_type', ['official_bank_website', 'stock_exchange_filing', 'regulator_publication', 'government_release', 'annual_report', 'press_release', 'secondary_reference', 'unknown']);
+export const bankLeadershipValidationStatusEnum = pgEnum('bank_leadership_validation_status', ['pending_review', 'official_source_confirmed', 'secondary_source_only', 'conflict_detected', 'rejected', 'imported']);
 
 // ─── 1. Users ────────────────────────────────────────────────────────────────
 
@@ -388,6 +391,8 @@ export const apifySourceConfigs = pgTable('apify_source_configs', {
   createdBy: uuid('created_by').references(() => users.id),
   isActive: boolean('is_active').notNull().default(true),
   lastRunAt: timestamp('last_run_at'),
+  lastRunStatus: varchar('last_run_status', { length: 32 }),
+  lastRunSummary: text('last_run_summary'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (table) => [
@@ -406,6 +411,7 @@ export const apifyRuns = pgTable('apify_runs', {
   actorId: varchar('actor_id', { length: 255 }),
   actorTaskId: varchar('actor_task_id', { length: 255 }),
   apifyRunId: varchar('apify_run_id', { length: 255 }),
+  datasetId: varchar('dataset_id', { length: 255 }),
   status: varchar('status', { length: 32 }).notNull().default('ready'),
   query: varchar('query', { length: 255 }),
   startUrls: jsonb('start_urls').notNull().default([]),
@@ -414,6 +420,10 @@ export const apifyRuns = pgTable('apify_runs', {
   normalizedOutput: jsonb('normalized_output').notNull().default([]),
   detectedChanges: jsonb('detected_changes').notNull().default([]),
   summary: text('summary'),
+  itemCount: integer('item_count').notNull().default(0),
+  errorMessage: text('error_message'),
+  sourceSnapshot: jsonb('source_snapshot').notNull().default({}),
+  executionMeta: jsonb('execution_meta').notNull().default({}),
   targetOrganizationId: uuid('target_organization_id').references(() => organizations.id),
   targetPersonId: uuid('target_person_id').references(() => persons.id),
   initiatedBy: uuid('initiated_by').references(() => users.id),
@@ -426,6 +436,41 @@ export const apifyRuns = pgTable('apify_runs', {
   index('apify_run_status_idx').on(table.status, table.createdAt),
   index('apify_run_target_org_idx').on(table.targetOrganizationId, table.createdAt),
   index('apify_run_target_person_idx').on(table.targetPersonId, table.createdAt),
+]);
+
+export const bankLeadershipRecords = pgTable('bank_leadership_records', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').references(() => organizations.id),
+  apifyRunId: uuid('apify_run_id').references(() => apifyRuns.id),
+  sourceConfigId: uuid('source_config_id').references(() => apifySourceConfigs.id),
+  roleType: bankLeadershipRoleEnum('role_type').notNull().default('other'),
+  personName: varchar('person_name', { length: 255 }).notNull(),
+  title: varchar('title', { length: 255 }).notNull(),
+  normalizedTitle: varchar('normalized_title', { length: 255 }),
+  bankName: varchar('bank_name', { length: 255 }).notNull(),
+  bankType: orgTypeEnum('bank_type'),
+  sourceUrl: text('source_url').notNull(),
+  sourceDomain: varchar('source_domain', { length: 255 }),
+  sourceType: bankLeadershipSourceTypeEnum('source_type').notNull().default('unknown'),
+  sourcePublishedDate: date('source_published_date'),
+  sourceObservedAt: timestamp('source_observed_at').notNull().defaultNow(),
+  sourceExcerpt: text('source_excerpt'),
+  sourcePayload: jsonb('source_payload').notNull().default({}),
+  validationStatus: bankLeadershipValidationStatusEnum('validation_status').notNull().default('pending_review'),
+  confidenceLevel: confidenceLevelEnum('confidence_level').notNull().default('medium'),
+  confidenceScore: real('confidence_score'),
+  validationNotes: text('validation_notes'),
+  validationEvidence: jsonb('validation_evidence').notNull().default([]),
+  isImported: boolean('is_imported').notNull().default(false),
+  importedPersonId: uuid('imported_person_id').references(() => persons.id),
+  importedTenureId: uuid('imported_tenure_id').references(() => tenures.id),
+  createdBy: uuid('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  index('bank_leadership_org_idx').on(table.organizationId, table.validationStatus, table.createdAt),
+  index('bank_leadership_run_idx').on(table.apifyRunId, table.createdAt),
+  index('bank_leadership_source_idx').on(table.sourceConfigId, table.roleType, table.createdAt),
 ]);
 
 // ─── Relations ───────────────────────────────────────────────────────────────
@@ -451,6 +496,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   dismissedAlerts: many(alerts),
   apifySourceConfigs: many(apifySourceConfigs),
   apifyRuns: many(apifyRuns),
+  bankLeadershipRecords: many(bankLeadershipRecords),
 }));
 
 export const domainsRelations = relations(domains, ({ one, many }) => ({
@@ -487,6 +533,7 @@ export const organizationsRelations = relations(organizations, ({ one, many }) =
   alerts: many(alerts),
   apifySourceConfigs: many(apifySourceConfigs),
   apifyRuns: many(apifyRuns),
+  bankLeadershipRecords: many(bankLeadershipRecords),
 }));
 
 export const orgHierarchyRelations = relations(orgHierarchy, ({ one }) => ({
@@ -524,9 +571,10 @@ export const personsRelations = relations(persons, ({ one, many }) => ({
   briefings: many(briefings),
   apifySourceConfigs: many(apifySourceConfigs),
   apifyRuns: many(apifyRuns),
+  importedBankLeadershipRecords: many(bankLeadershipRecords),
 }));
 
-export const tenuresRelations = relations(tenures, ({ one }) => ({
+export const tenuresRelations = relations(tenures, ({ one, many }) => ({
   person: one(persons, {
     fields: [tenures.personId],
     references: [persons.id],
@@ -539,6 +587,7 @@ export const tenuresRelations = relations(tenures, ({ one }) => ({
     fields: [tenures.createdBy],
     references: [users.id],
   }),
+  importedBankLeadershipRecords: many(bankLeadershipRecords),
 }));
 
 export const relationshipsRelations = relations(relationships, ({ one }) => ({
@@ -696,7 +745,7 @@ export const apifySourceConfigsRelations = relations(apifySourceConfigs, ({ one,
   runs: many(apifyRuns),
 }));
 
-export const apifyRunsRelations = relations(apifyRuns, ({ one }) => ({
+export const apifyRunsRelations = relations(apifyRuns, ({ one, many }) => ({
   sourceConfig: one(apifySourceConfigs, {
     fields: [apifyRuns.sourceConfigId],
     references: [apifySourceConfigs.id],
@@ -711,6 +760,34 @@ export const apifyRunsRelations = relations(apifyRuns, ({ one }) => ({
   }),
   initiatedByUser: one(users, {
     fields: [apifyRuns.initiatedBy],
+    references: [users.id],
+  }),
+  bankLeadershipRecords: many(bankLeadershipRecords),
+}));
+
+export const bankLeadershipRecordsRelations = relations(bankLeadershipRecords, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [bankLeadershipRecords.organizationId],
+    references: [organizations.id],
+  }),
+  apifyRun: one(apifyRuns, {
+    fields: [bankLeadershipRecords.apifyRunId],
+    references: [apifyRuns.id],
+  }),
+  sourceConfig: one(apifySourceConfigs, {
+    fields: [bankLeadershipRecords.sourceConfigId],
+    references: [apifySourceConfigs.id],
+  }),
+  importedPerson: one(persons, {
+    fields: [bankLeadershipRecords.importedPersonId],
+    references: [persons.id],
+  }),
+  importedTenure: one(tenures, {
+    fields: [bankLeadershipRecords.importedTenureId],
+    references: [tenures.id],
+  }),
+  createdByUser: one(users, {
+    fields: [bankLeadershipRecords.createdBy],
     references: [users.id],
   }),
 }));
@@ -779,3 +856,6 @@ export type InsertApifySourceConfig = typeof apifySourceConfigs.$inferInsert;
 
 export type ApifyRun = typeof apifyRuns.$inferSelect;
 export type InsertApifyRun = typeof apifyRuns.$inferInsert;
+
+export type BankLeadershipRecord = typeof bankLeadershipRecords.$inferSelect;
+export type InsertBankLeadershipRecord = typeof bankLeadershipRecords.$inferInsert;
