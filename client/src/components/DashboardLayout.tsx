@@ -23,7 +23,9 @@ import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
   Bell,
+  Bot,
   Building2,
+  Database,
   FileText,
   Globe,
   LayoutDashboard,
@@ -55,6 +57,8 @@ const adminItems = [
   { icon: UserCog, label: "Users", path: "/admin/users" },
   { icon: Mail, label: "Access Requests", path: "/admin/requests" },
   { icon: Globe, label: "Domains", path: "/admin/domains" },
+  { icon: Bot, label: "Apify Ops", path: "/admin/apify" },
+  { icon: Database, label: "Bank Dataset", path: "/admin/bank-dataset" },
   { icon: ScrollText, label: "Audit Log", path: "/admin/audit" },
 ];
 

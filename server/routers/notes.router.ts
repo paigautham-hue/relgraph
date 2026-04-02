@@ -106,13 +106,23 @@ export const notesRouter = router({
 
   create: contributorProcedure.input(createNoteSchema).mutation(async ({ input, ctx }) => {
     const db = getDb();
-    const [note] = await db
+    await db
       .insert(personNotes)
       .values({
         ...input,
         authorId: ctx.user.id,
-      })
-      .returning();
+      });
+
+    const [note] = await db
+      .select()
+      .from(personNotes)
+      .where(eq(personNotes.authorId, ctx.user.id))
+      .orderBy(desc(personNotes.createdAt))
+      .limit(1);
+
+    if (!note) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create note" });
+    }
 
     logAudit({
       userId: ctx.user.id,
@@ -138,11 +148,20 @@ export const notesRouter = router({
       .limit(1);
     if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Note not found" });
 
-    const [updated] = await db
+    await db
       .update(personNotes)
       .set({ ...data, updatedAt: new Date() })
+      .where(eq(personNotes.id, id));
+
+    const [updated] = await db
+      .select()
+      .from(personNotes)
       .where(eq(personNotes.id, id))
-      .returning();
+      .limit(1);
+
+    if (!updated) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update note" });
+    }
 
     logAudit({
       userId: ctx.user.id,

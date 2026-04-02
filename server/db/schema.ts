@@ -1,19 +1,18 @@
 import {
-  pgTable,
-  uuid,
+  mysqlTable,
   varchar,
   text,
   boolean,
   timestamp,
   date,
-  integer,
-  real,
-  jsonb,
-  pgEnum,
+  int,
+  double,
+  json,
+  mysqlEnum,
   index,
-} from 'drizzle-orm/pg-core';
+} from 'drizzle-orm/mysql-core';
+import { sql } from 'drizzle-orm';
 import { relations } from 'drizzle-orm';
-
 import {
   USER_ROLES,
   ORG_TYPES,
@@ -36,6 +35,21 @@ import {
   PERSON_CATEGORIES,
   EXTERNAL_CONNECTION_SOURCES,
 } from '../../shared/enums';
+
+const pgTable = mysqlTable as typeof mysqlTable;
+const pgEnum = (_enumName: string, values: readonly [string, ...string[]]) => {
+  return (columnName: string) => mysqlEnum(columnName, values as [string, ...string[]]);
+};
+const integer = int;
+const jsonb = json;
+const real = double;
+const uuid = (name: string) => {
+  const column = varchar(name, { length: 36 }) as ReturnType<typeof varchar> & {
+    defaultRandom: () => ReturnType<typeof varchar>;
+  };
+  column.defaultRandom = () => column.$defaultFn(() => crypto.randomUUID()) as ReturnType<typeof varchar>;
+  return column;
+};
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
@@ -355,6 +369,65 @@ export const chatMessages = pgTable('chat_messages', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
+// ─── 20. Apify Source Configs ────────────────────────────────────────────────
+
+export const apifySourceConfigs = pgTable('apify_source_configs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 120 }).notNull(),
+  description: text('description'),
+  capability: varchar('capability', { length: 32 }).notNull(),
+  targetType: varchar('target_type', { length: 32 }).notNull(),
+  actorId: varchar('actor_id', { length: 255 }),
+  actorTaskId: varchar('actor_task_id', { length: 255 }),
+  defaultInput: jsonb('default_input').notNull().default({}),
+  fieldMappings: jsonb('field_mappings').notNull().default({}),
+  watchFields: jsonb('watch_fields').notNull().default([]),
+  runFrequencyCron: varchar('run_frequency_cron', { length: 100 }),
+  targetOrganizationId: uuid('target_organization_id').references(() => organizations.id),
+  targetPersonId: uuid('target_person_id').references(() => persons.id),
+  createdBy: uuid('created_by').references(() => users.id),
+  isActive: boolean('is_active').notNull().default(true),
+  lastRunAt: timestamp('last_run_at'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  index('apify_source_capability_idx').on(table.capability, table.isActive),
+  index('apify_source_target_org_idx').on(table.targetOrganizationId),
+  index('apify_source_target_person_idx').on(table.targetPersonId),
+]);
+
+// ─── 21. Apify Runs ──────────────────────────────────────────────────────────
+
+export const apifyRuns = pgTable('apify_runs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sourceConfigId: uuid('source_config_id').references(() => apifySourceConfigs.id),
+  capability: varchar('capability', { length: 32 }).notNull(),
+  targetType: varchar('target_type', { length: 32 }).notNull(),
+  actorId: varchar('actor_id', { length: 255 }),
+  actorTaskId: varchar('actor_task_id', { length: 255 }),
+  apifyRunId: varchar('apify_run_id', { length: 255 }),
+  status: varchar('status', { length: 32 }).notNull().default('ready'),
+  query: varchar('query', { length: 255 }),
+  startUrls: jsonb('start_urls').notNull().default([]),
+  inputPayload: jsonb('input_payload').notNull().default({}),
+  outputPreview: jsonb('output_preview').notNull().default([]),
+  normalizedOutput: jsonb('normalized_output').notNull().default([]),
+  detectedChanges: jsonb('detected_changes').notNull().default([]),
+  summary: text('summary'),
+  targetOrganizationId: uuid('target_organization_id').references(() => organizations.id),
+  targetPersonId: uuid('target_person_id').references(() => persons.id),
+  initiatedBy: uuid('initiated_by').references(() => users.id),
+  startedAt: timestamp('started_at'),
+  finishedAt: timestamp('finished_at'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  index('apify_run_source_idx').on(table.sourceConfigId, table.createdAt),
+  index('apify_run_status_idx').on(table.status, table.createdAt),
+  index('apify_run_target_org_idx').on(table.targetOrganizationId, table.createdAt),
+  index('apify_run_target_person_idx').on(table.targetPersonId, table.createdAt),
+]);
+
 // ─── Relations ───────────────────────────────────────────────────────────────
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -376,6 +449,8 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   relationships: many(relationships),
   externalConnections: many(externalConnections),
   dismissedAlerts: many(alerts),
+  apifySourceConfigs: many(apifySourceConfigs),
+  apifyRuns: many(apifyRuns),
 }));
 
 export const domainsRelations = relations(domains, ({ one, many }) => ({
@@ -410,6 +485,8 @@ export const organizationsRelations = relations(organizations, ({ one, many }) =
   persons: many(persons),
   tenures: many(tenures),
   alerts: many(alerts),
+  apifySourceConfigs: many(apifySourceConfigs),
+  apifyRuns: many(apifyRuns),
 }));
 
 export const orgHierarchyRelations = relations(orgHierarchy, ({ one }) => ({
@@ -445,6 +522,8 @@ export const personsRelations = relations(persons, ({ one, many }) => ({
   intel: many(personIntel),
   alerts: many(alerts),
   briefings: many(briefings),
+  apifySourceConfigs: many(apifySourceConfigs),
+  apifyRuns: many(apifyRuns),
 }));
 
 export const tenuresRelations = relations(tenures, ({ one }) => ({
@@ -601,6 +680,41 @@ export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
   }),
 }));
 
+export const apifySourceConfigsRelations = relations(apifySourceConfigs, ({ one, many }) => ({
+  targetOrganization: one(organizations, {
+    fields: [apifySourceConfigs.targetOrganizationId],
+    references: [organizations.id],
+  }),
+  targetPerson: one(persons, {
+    fields: [apifySourceConfigs.targetPersonId],
+    references: [persons.id],
+  }),
+  createdByUser: one(users, {
+    fields: [apifySourceConfigs.createdBy],
+    references: [users.id],
+  }),
+  runs: many(apifyRuns),
+}));
+
+export const apifyRunsRelations = relations(apifyRuns, ({ one }) => ({
+  sourceConfig: one(apifySourceConfigs, {
+    fields: [apifyRuns.sourceConfigId],
+    references: [apifySourceConfigs.id],
+  }),
+  targetOrganization: one(organizations, {
+    fields: [apifyRuns.targetOrganizationId],
+    references: [organizations.id],
+  }),
+  targetPerson: one(persons, {
+    fields: [apifyRuns.targetPersonId],
+    references: [persons.id],
+  }),
+  initiatedByUser: one(users, {
+    fields: [apifyRuns.initiatedBy],
+    references: [users.id],
+  }),
+}));
+
 // ─── Inferred Types ──────────────────────────────────────────────────────────
 
 export type User = typeof users.$inferSelect;
@@ -659,3 +773,9 @@ export type InsertChatConversation = typeof chatConversations.$inferInsert;
 
 export type ChatMessage = typeof chatMessages.$inferSelect;
 export type InsertChatMessage = typeof chatMessages.$inferInsert;
+
+export type ApifySourceConfig = typeof apifySourceConfigs.$inferSelect;
+export type InsertApifySourceConfig = typeof apifySourceConfigs.$inferInsert;
+
+export type ApifyRun = typeof apifyRuns.$inferSelect;
+export type InsertApifyRun = typeof apifyRuns.$inferInsert;

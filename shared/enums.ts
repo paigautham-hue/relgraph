@@ -59,11 +59,11 @@ export const AUDIT_ACTION_TYPES = ['view', 'create', 'update', 'delete', 'search
 export type AuditActionType = (typeof AUDIT_ACTION_TYPES)[number];
 
 // Audit entity types
-export const AUDIT_ENTITY_TYPES = ['person', 'organization', 'interaction', 'reflection', 'note', 'tenure', 'relationship', 'intel_field', 'user', 'domain', 'external_connection', 'alert', 'briefing', 'chat_conversation'] as const;
+export const AUDIT_ENTITY_TYPES = ['person', 'organization', 'interaction', 'reflection', 'note', 'tenure', 'relationship', 'intel_field', 'user', 'domain', 'external_connection', 'alert', 'briefing', 'chat_conversation', 'apify_source', 'apify_run'] as const;
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];
 
 // Alert types
-export const ALERT_TYPES = ['movement_detected', 'relationship_decay', 'opportunity', 'new_person_added', 'coverage_gap'] as const;
+export const ALERT_TYPES = ['movement_detected', 'relationship_decay', 'opportunity', 'new_person_added', 'coverage_gap', 'source_change_detected', 'source_run_failed', 'new_lead_discovered'] as const;
 export type AlertType = (typeof ALERT_TYPES)[number];
 
 // Alert severity

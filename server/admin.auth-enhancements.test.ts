@@ -68,17 +68,31 @@ function createDbMock(updatedRows: Array<{ id: string; email: string; role: stri
   const set = vi.fn(() => ({ where: whereForUpdate }));
   const update = vi.fn(() => ({ set }));
 
+  let selectIndex = 0;
+  const limit = vi.fn(async () => {
+    const row = updatedRows[selectIndex++];
+    return row ? [row] : [];
+  });
+  const whereForSelect = vi.fn(() => ({ limit }));
+  const from = vi.fn(() => ({ where: whereForSelect }));
+  const select = vi.fn(() => ({ from }));
+
   const deleteWhere = vi.fn(async () => undefined);
   const del = vi.fn(() => ({ where: deleteWhere }));
 
   return {
     update,
+    select,
     delete: del,
     spies: {
       returning,
       whereForUpdate,
       set,
       update,
+      select,
+      from,
+      whereForSelect,
+      limit,
       deleteWhere,
       del,
     },

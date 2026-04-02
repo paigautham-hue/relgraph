@@ -43,3 +43,16 @@
 - [x] Add a People import history view with searchable validation and import run details
 - [x] Add an admin contact-import template settings screen for category-based field configuration
 - [x] Update the People import dialog to handle duplicate blocking, dynamic extra columns, and import history access
+- [ ] Design the Apify feature set for RelGraph around lead ingestion, profile enrichment, and monitoring
+- [ ] Add backend Apify integration for source runs, normalization, and import-ready output
+- [ ] Add frontend workflows for Apify-powered discovery, enrichment, and monitoring management
+- [ ] Add project configuration for the Apify API token and validate the integration
+- [ ] Add tests and validation for the Apify-powered RelGraph workflows
+- [ ] Repair the broken database migration metadata and restore a safe schema rollout path for new persistence features
+- [ ] Fix live database connectivity so backend schema validation and data writes work reliably
+- [ ] Implement persistent Apify source configuration, run history, and monitoring storage
+- [ ] Add an Indian bank leadership dataset pipeline covering public and private sector banks with source-traceable records for chairman, managing director, chairman and managing director, and executive director roles
+- [ ] Validate bank leadership records against authoritative public sources and document confidence limits before import
+- [ ] Continue the UI and service-layer integration for Apify workflows and the Indian bank leadership dataset pipeline across the existing RelGraph screens and backend services
+- [ ] Resolve the current authenticated admin validation blocker caused by failed sign-in during Apify workflow verification
+- [x] Document the Cloudflare human-verification blocker preventing authenticated browser validation of the new admin workflows

@@ -31,13 +31,24 @@ function getClient(): Anthropic {
 
 export async function createConversation(userId: string, title?: string) {
   const db = getDb();
+  const conversationId = crypto.randomUUID();
+
+  await db.insert(chatConversations).values({
+    id: conversationId,
+    userId,
+    title: title || 'New conversation',
+  });
+
   const [conv] = await db
-    .insert(chatConversations)
-    .values({
-      userId,
-      title: title || 'New conversation',
-    })
-    .returning();
+    .select()
+    .from(chatConversations)
+    .where(eq(chatConversations.id, conversationId))
+    .limit(1);
+
+  if (!conv) {
+    throw new Error('Conversation could not be created');
+  }
+
   return conv;
 }
 

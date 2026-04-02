@@ -94,13 +94,23 @@ export const intelRouter = router({
 
   create: contributorProcedure.input(createIntelSchema).mutation(async ({ input, ctx }) => {
     const db = getDb();
-    const [intel] = await db
+    await db
       .insert(personIntel)
       .values({
         ...input,
         contributedBy: ctx.user.id,
-      })
-      .returning();
+      });
+
+    const [intel] = await db
+      .select()
+      .from(personIntel)
+      .where(eq(personIntel.personId, input.personId))
+      .orderBy(desc(personIntel.createdAt))
+      .limit(1);
+
+    if (!intel) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create intel entry" });
+    }
 
     logAudit({
       userId: ctx.user.id,
@@ -127,11 +137,20 @@ export const intelRouter = router({
     if (!existing)
       throw new TRPCError({ code: "NOT_FOUND", message: "Intel entry not found" });
 
-    const [updated] = await db
+    await db
       .update(personIntel)
       .set({ ...data, updatedAt: new Date() })
+      .where(eq(personIntel.id, id));
+
+    const [updated] = await db
+      .select()
+      .from(personIntel)
       .where(eq(personIntel.id, id))
-      .returning();
+      .limit(1);
+
+    if (!updated) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update intel entry" });
+    }
 
     logAudit({
       userId: ctx.user.id,

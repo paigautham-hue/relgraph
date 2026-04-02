@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 import {
   USER_ROLES, ORG_TYPES, TENURE_SOURCES, RELATIONSHIP_TYPES, STRENGTH_LABELS,
   EXTERNAL_CONNECTION_TYPES, INTERACTION_TYPES, PARTICIPANT_ROLES, INPUT_METHODS,
@@ -312,6 +312,103 @@ export const resolveContactImportDuplicatesSchema = z.object({
       resolution: z.enum(["skip_existing", "import_anyway"]),
     }),
   ).min(1),
+});
+
+// Apify
+export const apifyCapabilitySchema = z.enum(["discovery", "enrichment", "monitoring"]);
+export const apifyTargetTypeSchema = z.enum(["search", "organization", "person"]);
+export const apifyRunStatusSchema = z.enum(["ready", "running", "succeeded", "failed"]);
+
+const apifyJsonRecordSchema: z.ZodType<Record<string, unknown>> = z.record(z.string(), z.unknown());
+
+export const createApifySourceConfigSchema = z.object({
+  name: z.string().min(1).max(120),
+  description: z.string().max(500).optional(),
+  capability: apifyCapabilitySchema,
+  targetType: apifyTargetTypeSchema,
+  actorId: z.string().min(1).max(255).optional(),
+  actorTaskId: z.string().min(1).max(255).optional(),
+  defaultInput: apifyJsonRecordSchema.default({}),
+  fieldMappings: z.record(z.string(), z.string()).default({}),
+  watchFields: z.array(z.string().min(1).max(100)).default([]),
+  runFrequencyCron: z.string().max(100).optional(),
+  targetOrganizationId: z.string().uuid().nullable().optional(),
+  targetPersonId: z.string().uuid().nullable().optional(),
+  isActive: z.boolean().default(true),
+}).refine((value) => Boolean(value.actorId || value.actorTaskId), {
+  message: "Either actorId or actorTaskId is required",
+  path: ["actorId"],
+});
+
+export const updateApifySourceConfigSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(120).optional(),
+  description: z.string().max(500).nullable().optional(),
+  capability: apifyCapabilitySchema.optional(),
+  targetType: apifyTargetTypeSchema.optional(),
+  actorId: z.string().min(1).max(255).nullable().optional(),
+  actorTaskId: z.string().min(1).max(255).nullable().optional(),
+  defaultInput: apifyJsonRecordSchema.optional(),
+  fieldMappings: z.record(z.string(), z.string()).optional(),
+  watchFields: z.array(z.string().min(1).max(100)).optional(),
+  runFrequencyCron: z.string().max(100).nullable().optional(),
+  targetOrganizationId: z.string().uuid().nullable().optional(),
+  targetPersonId: z.string().uuid().nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const apifySourceFilterSchema = paginationSchema.extend({
+  capability: apifyCapabilitySchema.optional(),
+  targetType: apifyTargetTypeSchema.optional(),
+  isActive: z.boolean().optional(),
+  search: z.string().optional(),
+});
+
+export const runApifySourceSchema = z.object({
+  sourceConfigId: z.string().uuid().optional(),
+  actorId: z.string().min(1).max(255).optional(),
+  actorTaskId: z.string().min(1).max(255).optional(),
+  capability: apifyCapabilitySchema.optional(),
+  targetType: apifyTargetTypeSchema.optional(),
+  query: z.string().max(255).optional(),
+  startUrls: z.array(z.string().url()).max(20).optional(),
+  targetOrganizationId: z.string().uuid().optional(),
+  targetPersonId: z.string().uuid().optional(),
+  maxItems: z.number().int().min(1).max(200).default(25),
+  inputOverrides: apifyJsonRecordSchema.default({}),
+}).refine((value) => Boolean(value.sourceConfigId || value.actorId || value.actorTaskId), {
+  message: "Provide a saved source config or an actor/task identifier",
+  path: ["sourceConfigId"],
+});
+
+export const apifyRunFilterSchema = paginationSchema.extend({
+  sourceConfigId: z.string().uuid().optional(),
+  capability: apifyCapabilitySchema.optional(),
+  status: apifyRunStatusSchema.optional(),
+  targetPersonId: z.string().uuid().optional(),
+  targetOrganizationId: z.string().uuid().optional(),
+});
+
+export const apifyRunLookupSchema = z.object({
+  id: z.string().uuid(),
+});
+
+export const applyApifyDiscoverySchema = z.object({
+  runId: z.string().uuid(),
+  domainId: z.string().uuid(),
+  selectedItemIndexes: z.array(z.number().int().min(0)).min(1),
+  defaultCategory: z.enum(PERSON_CATEGORIES).optional(),
+});
+
+export const applyApifyEnrichmentSchema = z.object({
+  runId: z.string().uuid(),
+  personId: z.string().uuid(),
+  selectedFields: z.array(z.string().min(1)).default([]),
+});
+
+export const syncApifyMonitoringSchema = z.object({
+  sourceConfigId: z.string().uuid(),
+  createAlerts: z.boolean().default(true),
 });
 
 // Domain

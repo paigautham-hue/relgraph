@@ -97,12 +97,17 @@ export const organizationsRouter = router({
 
   create: contributorProcedure.input(createOrganizationSchema).mutation(async ({ input, ctx }) => {
     const db = getDb();
-    const [org] = await db
-      .insert(organizations)
-      .values({
-        ...input,
-      })
-      .returning();
+    const orgId = crypto.randomUUID();
+
+    await db.insert(organizations).values({
+      id: orgId,
+      ...input,
+    });
+
+    const [org] = await db.select().from(organizations).where(eq(organizations.id, orgId)).limit(1);
+    if (!org) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Organization could not be created" });
+    }
 
     logAudit({
       userId: ctx.user.id,
@@ -128,11 +133,19 @@ export const organizationsRouter = router({
       .limit(1);
     if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
 
-    const [updated] = await db
+    await db
       .update(organizations)
       .set({ ...data, updatedAt: new Date() })
+      .where(eq(organizations.id, id));
+
+    const [updated] = await db
+      .select()
+      .from(organizations)
       .where(eq(organizations.id, id))
-      .returning();
+      .limit(1);
+    if (!updated) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Organization could not be updated" });
+    }
 
     logAudit({
       userId: ctx.user.id,

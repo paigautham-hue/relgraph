@@ -128,13 +128,25 @@ export const reflectionsRouter = router({
 
   create: contributorProcedure.input(createReflectionSchema).mutation(async ({ input, ctx }) => {
     const db = getDb();
-    const [reflection] = await db
+    const reflectionId = crypto.randomUUID();
+
+    await db
       .insert(reflections)
       .values({
         ...input,
+        id: reflectionId,
         authorId: ctx.user.id,
-      })
-      .returning();
+      });
+
+    const [reflection] = await db
+      .select()
+      .from(reflections)
+      .where(eq(reflections.id, reflectionId))
+      .limit(1);
+
+    if (!reflection) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Reflection could not be created" });
+    }
 
     logAudit({
       userId: ctx.user.id,
@@ -160,11 +172,20 @@ export const reflectionsRouter = router({
       .limit(1);
     if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Reflection not found" });
 
-    const [updated] = await db
+    await db
       .update(reflections)
       .set({ ...data, updatedAt: new Date() })
+      .where(eq(reflections.id, id));
+
+    const [updated] = await db
+      .select()
+      .from(reflections)
       .where(eq(reflections.id, id))
-      .returning();
+      .limit(1);
+
+    if (!updated) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Reflection could not be updated" });
+    }
 
     logAudit({
       userId: ctx.user.id,

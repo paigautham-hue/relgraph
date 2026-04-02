@@ -225,21 +225,25 @@ export async function logInteraction(
   const [person] = await db.select().from(persons).where(like(persons.name, `%${data.personName}%`)).limit(1);
   if (!person) return { error: `Person "${data.personName}" not found in graph` };
 
-  const [interaction] = await db.insert(interactions).values({
+  const interactionId = crypto.randomUUID();
+
+  await db.insert(interactions).values({
+    id: interactionId,
     type: data.type as any,
     summary: data.summary,
     occurredAt: data.date ? new Date(data.date) : new Date(),
     inputMethod: 'voice',
     createdBy: userId,
-  }).returning();
+  });
 
   await db.insert(interactionParticipants).values({
-    interactionId: interaction.id,
+    id: crypto.randomUUID(),
+    interactionId,
     personId: person.id,
     role: 'attendee',
   });
 
-  return { success: true, interactionId: interaction.id, personName: person.name };
+  return { success: true, interactionId, personName: person.name };
 }
 
 // Add a reflection from AI
@@ -251,7 +255,10 @@ export async function addReflection(
   const [person] = await db.select().from(persons).where(like(persons.name, `%${data.personName}%`)).limit(1);
   if (!person) return { error: `Person "${data.personName}" not found in graph` };
 
-  const [reflection] = await db.insert(reflections).values({
+  const reflectionId = crypto.randomUUID();
+
+  await db.insert(reflections).values({
+    id: reflectionId,
     personId: person.id,
     authorId: userId,
     category: data.category as any,
@@ -259,9 +266,9 @@ export async function addReflection(
     confidenceLevel: 'medium',
     inputMethod: 'voice',
     visibilityLevel: 'contributor',
-  }).returning();
+  });
 
-  return { success: true, reflectionId: reflection.id, personName: person.name };
+  return { success: true, reflectionId, personName: person.name };
 }
 
 // Compare coverage across organizations

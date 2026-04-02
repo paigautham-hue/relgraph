@@ -250,7 +250,7 @@ export const personsRouter = router({
         .filter((issue) => issue.message.includes("Likely duplicate contacts were found in RelGraph"))
         .map((issue) => issue.rowNumber);
 
-      const requestedRows = new Set(input.rows.map((row) => row.rowNumber));
+      const requestedRows = new Set(input.rows.map((row: (typeof input.rows)[number]) => row.rowNumber));
       const missingRows = unresolvedRows.filter((rowNumber) => !requestedRows.has(rowNumber));
       if (missingRows.length > 0) {
         throw new TRPCError({
@@ -354,24 +354,35 @@ export const personsRouter = router({
         });
       }
 
-      const created = await db
-        .insert(persons)
-        .values(
-          input.rows.map((row: (typeof input.rows)[number]) => ({
-            name: row.name,
-            currentTitle: row.currentTitle,
-            currentOrgId: row.organizationId ?? null,
-            category: row.category,
-            photoUrl: row.photoUrl,
-            isTracked: row.isTracked,
-            createdBy: ctx.user.id,
-          })),
-        )
-        .returning();
+      const rowsToInsert = input.rows.map((row: (typeof input.rows)[number]) => ({
+        id: crypto.randomUUID(),
+        name: row.name,
+        currentTitle: row.currentTitle,
+        currentOrgId: row.organizationId ?? null,
+        category: row.category,
+        photoUrl: row.photoUrl,
+        isTracked: row.isTracked,
+        createdBy: ctx.user.id,
+      }));
 
-      const createdByRowNumber = new Map(
-        created.map((person, index) => [input.rows[index]?.rowNumber, person] as const),
+      await db.insert(persons).values(rowsToInsert);
+
+      const created = await db
+        .select()
+        .from(persons)
+        .where(inArray(persons.id, rowsToInsert.map((row: (typeof rowsToInsert)[number]) => row.id)));
+
+      const createdById = new Map<string, (typeof created)[number]>(
+        created.map((person) => [person.id, person] as const),
       );
+      const createdByRowNumber = new Map<number, (typeof created)[number]>();
+      rowsToInsert.forEach((row: (typeof rowsToInsert)[number], index: number) => {
+        const rowNumber = input.rows[index]?.rowNumber;
+        const createdPerson = createdById.get(row.id);
+        if (typeof rowNumber === "number" && createdPerson) {
+          createdByRowNumber.set(rowNumber, createdPerson);
+        }
+      });
 
       const intelPayload = input.rows.flatMap((row: (typeof input.rows)[number]) => {
         const createdPerson = createdByRowNumber.get(row.rowNumber);
@@ -504,13 +515,20 @@ export const personsRouter = router({
 
   create: contributorProcedure.input(createPersonSchema).mutation(async ({ input, ctx }) => {
     const db = getDb();
-    const [person] = await db
+    const personId = crypto.randomUUID();
+
+    await db
       .insert(persons)
       .values({
         ...input,
+        id: personId,
         createdBy: ctx.user.id,
-      })
-      .returning();
+      });
+
+    const [person] = await db.select().from(persons).where(eq(persons.id, personId)).limit(1);
+    if (!person) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Person could not be created" });
+    }
 
     logAudit({
       userId: ctx.user.id,
@@ -532,11 +550,15 @@ export const personsRouter = router({
     const [existing] = await db.select().from(persons).where(eq(persons.id, id)).limit(1);
     if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Person not found" });
 
-    const [updated] = await db
+    await db
       .update(persons)
       .set({ ...data, updatedAt: new Date() })
-      .where(eq(persons.id, id))
-      .returning();
+      .where(eq(persons.id, id));
+
+    const [updated] = await db.select().from(persons).where(eq(persons.id, id)).limit(1);
+    if (!updated) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Person could not be updated" });
+    }
 
     logAudit({
       userId: ctx.user.id,

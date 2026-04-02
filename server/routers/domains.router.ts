@@ -41,7 +41,13 @@ export const domainsRouter = router({
 
   create: adminProcedure.input(createDomainSchema).mutation(async ({ input, ctx }) => {
     const db = getDb();
-    const [domain] = await db.insert(domains).values(input).returning();
+    const insertResult = await db.insert(domains).values(input);
+    const domainId = String(insertResult[0].insertId);
+    const [domain] = await db.select().from(domains).where(eq(domains.id, domainId)).limit(1);
+
+    if (!domain) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Domain could not be created" });
+    }
 
     logAudit({
       userId: ctx.user.id,
@@ -63,11 +69,15 @@ export const domainsRouter = router({
     const [existing] = await db.select().from(domains).where(eq(domains.id, id)).limit(1);
     if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Domain not found" });
 
-    const [updated] = await db
+    await db
       .update(domains)
       .set({ ...data, updatedAt: new Date() })
-      .where(eq(domains.id, id))
-      .returning();
+      .where(eq(domains.id, id));
+
+    const [updated] = await db.select().from(domains).where(eq(domains.id, id)).limit(1);
+    if (!updated) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Domain could not be updated" });
+    }
 
     logAudit({
       userId: ctx.user.id,

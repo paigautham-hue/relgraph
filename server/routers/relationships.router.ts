@@ -5,9 +5,9 @@ import { RELATIONSHIP_TYPES, STRENGTH_LABELS } from "@shared/enums";
 import { getDb } from "../db";
 import { relationships, persons } from "../db/schema";
 import { eq, and, or, desc, asc, count, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/mysql-core";
 import { logAudit, getClientIp } from "../middleware/audit";
 import { TRPCError } from "@trpc/server";
-import { alias } from "drizzle-orm/pg-core";
 
 const relationshipFilterSchema = paginationSchema.extend({
   personId: z.string().uuid().optional(),
@@ -122,13 +122,25 @@ export const relationshipsRouter = router({
     .input(createRelationshipSchema)
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
-      const [rel] = await db
+      const relationshipId = crypto.randomUUID();
+
+      await db
         .insert(relationships)
         .values({
           ...input,
+          id: relationshipId,
           declaredBy: ctx.user.id,
-        })
-        .returning();
+        });
+
+      const [rel] = await db
+        .select()
+        .from(relationships)
+        .where(eq(relationships.id, relationshipId))
+        .limit(1);
+
+      if (!rel) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Relationship could not be created" });
+      }
 
       logAudit({
         userId: ctx.user.id,
@@ -157,11 +169,20 @@ export const relationshipsRouter = router({
       if (!existing)
         throw new TRPCError({ code: "NOT_FOUND", message: "Relationship not found" });
 
-      const [updated] = await db
+      await db
         .update(relationships)
         .set({ ...data, updatedAt: new Date() })
+        .where(eq(relationships.id, id));
+
+      const [updated] = await db
+        .select()
+        .from(relationships)
         .where(eq(relationships.id, id))
-        .returning();
+        .limit(1);
+
+      if (!updated) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Relationship could not be updated" });
+      }
 
       logAudit({
         userId: ctx.user.id,

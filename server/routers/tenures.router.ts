@@ -106,13 +106,20 @@ export const tenuresRouter = router({
 
   create: contributorProcedure.input(createTenureSchema).mutation(async ({ input, ctx }) => {
     const db = getDb();
-    const [tenure] = await db
-      .insert(tenures)
-      .values({
-        ...input,
-        createdBy: ctx.user.id,
-      })
-      .returning();
+    const tenureId = crypto.randomUUID();
+
+    await db.insert(tenures).values({
+      ...input,
+      id: tenureId,
+      startDate: new Date(input.startDate),
+      endDate: input.endDate ? new Date(input.endDate) : null,
+      createdBy: ctx.user.id,
+    });
+
+    const [tenure] = await db.select().from(tenures).where(eq(tenures.id, tenureId)).limit(1);
+    if (!tenure) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Tenure could not be created" });
+    }
 
     logAudit({
       userId: ctx.user.id,
@@ -134,11 +141,21 @@ export const tenuresRouter = router({
     const [existing] = await db.select().from(tenures).where(eq(tenures.id, id)).limit(1);
     if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Tenure not found" });
 
-    const [updated] = await db
+    await db
       .update(tenures)
-      .set({ ...data, updatedAt: new Date() })
-      .where(eq(tenures.id, id))
-      .returning();
+      .set({
+        ...data,
+        startDate: data.startDate ? new Date(data.startDate) : undefined,
+        endDate:
+          data.endDate === null ? null : data.endDate ? new Date(data.endDate) : undefined,
+        updatedAt: new Date(),
+      })
+      .where(eq(tenures.id, id));
+
+    const [updated] = await db.select().from(tenures).where(eq(tenures.id, id)).limit(1);
+    if (!updated) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Tenure could not be updated" });
+    }
 
     logAudit({
       userId: ctx.user.id,

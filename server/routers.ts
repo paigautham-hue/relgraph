@@ -18,6 +18,7 @@ import { searchRouter } from "./routers/search.router";
 import { chatRouter } from "./routers/chat.router";
 import { briefingsRouter } from "./routers/briefings.router";
 import { alertsRouter } from "./routers/alerts.router";
+import { apifyRouter } from "./routers/apify.router";
 
 export const appRouter = router({
   system: systemRouter,
@@ -39,6 +40,7 @@ export const appRouter = router({
   chat: chatRouter,
   briefings: briefingsRouter,
   alerts: alertsRouter,
+  apify: apifyRouter,
 });
 
 export type AppRouter = typeof appRouter;

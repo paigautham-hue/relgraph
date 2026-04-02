@@ -227,7 +227,7 @@ export const adminRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Access request not found" });
       }
 
-      const [updated] = await db
+      await db
         .update(users)
         .set({
           role: input.role as any,
@@ -236,13 +236,18 @@ export const adminRouter = router({
           isActive: true,
           updatedAt: new Date(),
         })
-        .where(eq(users.id, requestUser.id))
-        .returning({
+        .where(eq(users.id, requestUser.id));
+
+      const [updated] = await db
+        .select({
           id: users.id,
           email: users.email,
           role: users.role,
           invitedBy: users.invitedBy,
-        });
+        })
+        .from(users)
+        .where(eq(users.id, requestUser.id))
+        .limit(1);
 
       logAudit({
         userId: ctx.user.id,
@@ -304,7 +309,7 @@ export const adminRouter = router({
           throw new TRPCError({ code: "NOT_FOUND", message: `Access request not found for ${email}` });
         }
 
-        const [updated] = await db
+        await db
           .update(users)
           .set({
             role: request.role as any,
@@ -313,13 +318,18 @@ export const adminRouter = router({
             isActive: true,
             updatedAt: new Date(),
           })
-          .where(eq(users.id, requestUser.id))
-          .returning({
+          .where(eq(users.id, requestUser.id));
+
+        const [updated] = await db
+          .select({
             id: users.id,
             email: users.email,
             role: users.role,
             invitedBy: users.invitedBy,
-          });
+          })
+          .from(users)
+          .where(eq(users.id, requestUser.id))
+          .limit(1);
 
         logAudit({
           userId: ctx.user.id,
@@ -402,16 +412,21 @@ export const adminRouter = router({
       }
 
       if (existingUser) {
-        const [updated] = await db
+        await db
           .update(users)
           .set({ role: input.role as any, invitedBy: ctx.user.id, updatedAt: new Date() })
-          .where(eq(users.id, existingUser.id))
-          .returning({
+          .where(eq(users.id, existingUser.id));
+
+        const [updated] = await db
+          .select({
             id: users.id,
             email: users.email,
             role: users.role,
             invitedBy: users.invitedBy,
-          });
+          })
+          .from(users)
+          .where(eq(users.id, existingUser.id))
+          .limit(1);
 
         return updated;
       }
@@ -488,7 +503,7 @@ export const adminRouter = router({
 
     const passwordHash = await hashPassword(input.password);
 
-    const [newUser] = await db
+    await db
       .insert(users)
       .values({
         email,
@@ -497,8 +512,18 @@ export const adminRouter = router({
         passwordHash,
         invitedBy: ctx.user.id,
         loginMethod: "password",
+      });
+
+    const [newUser] = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        name: users.name,
+        role: users.role,
       })
-      .returning();
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
 
     if (input.domainIds.length > 0) {
       await db.insert(userDomainAccess).values(

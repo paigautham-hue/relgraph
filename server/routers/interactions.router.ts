@@ -144,16 +144,25 @@ export const interactionsRouter = router({
     const db = getDb();
     const { participants, ...interactionData } = input;
 
-    const [interaction] = await db
+    await db
       .insert(interactions)
       .values({
         ...interactionData,
         occurredAt: new Date(interactionData.occurredAt),
         createdBy: ctx.user.id,
-      })
-      .returning();
+      });
 
-    // Insert participants
+    const [interaction] = await db
+      .select()
+      .from(interactions)
+      .where(eq(interactions.createdBy, ctx.user.id))
+      .orderBy(desc(interactions.createdAt))
+      .limit(1);
+
+    if (!interaction) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create interaction" });
+    }
+
     if (participants.length > 0) {
       await db.insert(interactionParticipants).values(
         participants.map((p) => ({
@@ -193,11 +202,20 @@ export const interactionsRouter = router({
       updateData.occurredAt = new Date(data.occurredAt);
     }
 
-    const [updated] = await db
+    await db
       .update(interactions)
       .set(updateData)
+      .where(eq(interactions.id, id));
+
+    const [updated] = await db
+      .select()
+      .from(interactions)
       .where(eq(interactions.id, id))
-      .returning();
+      .limit(1);
+
+    if (!updated) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update interaction" });
+    }
 
     logAudit({
       userId: ctx.user.id,
