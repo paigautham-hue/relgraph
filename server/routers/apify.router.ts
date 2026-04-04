@@ -6,10 +6,13 @@ import {
   apifySourceFilterSchema,
   applyApifyDiscoverySchema,
   applyApifyEnrichmentSchema,
+  bankLeadershipRecordFilterSchema,
   createApifySourceConfigSchema,
+  importBankLeadershipRecordSchema,
   runApifySourceSchema,
   syncApifyMonitoringSchema,
   updateApifySourceConfigSchema,
+  updateBankLeadershipRecordSchema,
 } from "@shared/validation";
 import {
   applyApifyDiscovery,
@@ -18,13 +21,17 @@ import {
   createIndianBankSeedPreview,
   getApifyRunById,
   getApifySourceConfigById,
+  getBankLeadershipRecordById,
   getIndianBankTargets,
+  importBankLeadershipRecord,
   listApifyRuns,
   listApifySourceConfigs,
+  listBankLeadershipRecords,
   runApifySource,
   seedIndianBankOrganizations,
   syncApifyMonitoring,
   updateApifySourceConfig,
+  updateBankLeadershipRecord,
 } from "../services/apify.service";
 
 export const apifyRouter = router({
@@ -86,6 +93,30 @@ export const apifyRouter = router({
     .input(syncApifyMonitoringSchema)
     .mutation(async ({ input }) => {
       return syncApifyMonitoring(input);
+    }),
+
+  listBankLeadershipRecords: protectedProcedure
+    .input(bankLeadershipRecordFilterSchema)
+    .query(async ({ input }) => {
+      return listBankLeadershipRecords(input);
+    }),
+
+  getBankLeadershipRecord: protectedProcedure
+    .input(apifyRunLookupSchema)
+    .query(async ({ input }) => {
+      return getBankLeadershipRecordById(input.id);
+    }),
+
+  updateBankLeadershipRecord: adminProcedure
+    .input(updateBankLeadershipRecordSchema)
+    .mutation(async ({ input }) => {
+      return updateBankLeadershipRecord(input);
+    }),
+
+  importBankLeadershipRecord: adminProcedure
+    .input(importBankLeadershipRecordSchema)
+    .mutation(async ({ ctx, input }) => {
+      return importBankLeadershipRecord(input, ctx.user.id);
     }),
 
   getIndianBankTargets: protectedProcedure

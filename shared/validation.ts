@@ -411,6 +411,69 @@ export const syncApifyMonitoringSchema = z.object({
   createAlerts: z.boolean().default(true),
 });
 
+export const bankLeadershipRoleTypeSchema = z.enum([
+  "chairman",
+  "managing_director",
+  "chairman_and_managing_director",
+  "executive_director",
+  "other",
+]);
+
+export const bankLeadershipSourceTypeSchema = z.enum([
+  "official_bank_website",
+  "stock_exchange_filing",
+  "regulator_publication",
+  "government_release",
+  "annual_report",
+  "press_release",
+  "secondary_reference",
+  "unknown",
+]);
+
+export const bankLeadershipValidationStatusSchema = z.enum([
+  "pending_review",
+  "official_source_confirmed",
+  "secondary_source_only",
+  "conflict_detected",
+  "rejected",
+  "imported",
+]);
+
+export const bankLeadershipRecordFilterSchema = paginationSchema.extend({
+  organizationId: z.string().uuid().optional(),
+  apifyRunId: z.string().uuid().optional(),
+  sourceConfigId: z.string().uuid().optional(),
+  validationStatus: bankLeadershipValidationStatusSchema.optional(),
+  roleType: bankLeadershipRoleTypeSchema.optional(),
+  onlyUnimported: z.boolean().optional(),
+  search: z.string().optional(),
+});
+
+export const updateBankLeadershipRecordSchema = z.object({
+  id: z.string().uuid(),
+  validationStatus: bankLeadershipValidationStatusSchema.optional(),
+  confidenceLevel: z.enum(CONFIDENCE_LEVELS).optional(),
+  confidenceScore: z.number().min(0).max(1).nullable().optional(),
+  validationNotes: z.string().max(5000).nullable().optional(),
+  validationEvidence: z.array(z.object({
+    label: z.string().min(1).max(255),
+    url: z.string().url().optional(),
+    note: z.string().max(1000).optional(),
+  })).optional(),
+  sourceType: bankLeadershipSourceTypeSchema.optional(),
+  sourcePublishedDate: z.string().nullable().optional(),
+});
+
+export const importBankLeadershipRecordSchema = z.object({
+  id: z.string().uuid(),
+  domainId: z.string().uuid().optional(),
+  createOrganizationIfMissing: z.boolean().default(true),
+  personNameOverride: z.string().min(1).max(255).optional(),
+  titleOverride: z.string().min(1).max(255).optional(),
+  startDate: z.string().optional(),
+  markAsCurrent: z.boolean().default(true),
+});
+
 // Domain
 export const createDomainSchema = z.object({
   name: z.string().min(1).max(255),

@@ -56,3 +56,8 @@
 - [ ] Continue the UI and service-layer integration for Apify workflows and the Indian bank leadership dataset pipeline across the existing RelGraph screens and backend services
 - [ ] Resolve the current authenticated admin validation blocker caused by failed sign-in during Apify workflow verification
 - [x] Document the Cloudflare human-verification blocker preventing authenticated browser validation of the new admin workflows
+- [x] Finish the Drizzle migration prompts and apply the schema changes for Apify persistence and bank-leadership validation storage
+- [x] Wire the new bank-leadership validation table through the Apify service layer and backend routes
+- [x] Complete the remaining admin screens for bank-leadership validation and updated Apify workflows
+- [x] Run authenticated end-to-end admin validation once sign-in is working again
+- [x] Fix the missing audit_log table so authenticated admin validation no longer triggers database errors during audit entry writes

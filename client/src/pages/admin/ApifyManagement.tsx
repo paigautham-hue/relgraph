@@ -89,6 +89,11 @@ export default function ApifyManagement() {
     },
   );
 
+  const leadershipRecordsQuery = trpc.apify.listBankLeadershipRecords.useQuery(
+    { page: 1, pageSize: 50, validationStatus: undefined },
+    { enabled: canManage, refetchOnWindowFocus: false },
+  );
+
   const createSourceMutation = trpc.apify.createSourceConfig.useMutation({
     onSuccess: async () => {
       toast.success("Apify source configuration created.");
@@ -198,6 +203,19 @@ export default function ApifyManagement() {
   const runs = runsQuery.data?.data ?? [];
   const bankTargets = bankTargetsQuery.data ?? [];
   const domains = (domainsQuery.data as Array<{ id: string; name: string }>) ?? [];
+  const leadershipRecords = leadershipRecordsQuery.data?.data ?? [];
+  const leadershipReviewStats = useMemo(() => {
+    return leadershipRecords.reduce(
+      (acc: { pending: number; confirmed: number; conflicts: number; imported: number }, record: any) => {
+        if (record.validationStatus === "pending_review") acc.pending += 1;
+        if (record.validationStatus === "official_source_confirmed") acc.confirmed += 1;
+        if (record.validationStatus === "conflict_detected") acc.conflicts += 1;
+        if (record.isImported) acc.imported += 1;
+        return acc;
+      },
+      { pending: 0, confirmed: 0, conflicts: 0, imported: 0 },
+    );
+  }, [leadershipRecords]);
 
   return (
     <div className="space-y-6">
@@ -355,7 +373,7 @@ export default function ApifyManagement() {
               </p>
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-2xl bg-muted/40 p-4">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Configured sources</p>
               <p className="mt-2 text-2xl font-semibold text-foreground">{sources.length}</p>
@@ -367,6 +385,10 @@ export default function ApifyManagement() {
             <div className="rounded-2xl bg-muted/40 p-4">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Indian bank targets</p>
               <p className="mt-2 text-2xl font-semibold text-foreground">{bankTargets.length}</p>
+            </div>
+            <div className="rounded-2xl bg-muted/40 p-4">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Pending leadership review</p>
+              <p className="mt-2 text-2xl font-semibold text-foreground">{leadershipReviewStats.pending}</p>
             </div>
           </div>
         </div>
@@ -406,7 +428,7 @@ export default function ApifyManagement() {
               Seed organizations and monitoring configs
             </Button>
             <Button type="button" variant="outline" asChild>
-              <a href="/admin/bank-dataset">Review full bank dataset</a>
+              <a href="/admin/bank-dataset">Open validation queue</a>
             </Button>
           </div>
           {bankPreviewQuery.data ? (
@@ -416,6 +438,25 @@ export default function ApifyManagement() {
               </p>
             </div>
           ) : null}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border bg-background/70 p-4">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Pending review</p>
+              <p className="mt-2 text-xl font-semibold text-foreground">{leadershipReviewStats.pending}</p>
+            </div>
+            <div className="rounded-2xl border bg-background/70 p-4">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Officially confirmed</p>
+              <p className="mt-2 text-xl font-semibold text-foreground">{leadershipReviewStats.confirmed}</p>
+            </div>
+            <div className="rounded-2xl border bg-background/70 p-4">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Imported into graph</p>
+              <p className="mt-2 text-xl font-semibold text-foreground">{leadershipReviewStats.imported}</p>
+            </div>
+          </div>
+          <div className="rounded-2xl border bg-background/70 p-4 text-sm text-muted-foreground">
+            <p>
+              Leadership records with conflicts or missing evidence should be reviewed in the bank dataset admin screen before import. Current conflict count: <span className="font-medium text-foreground">{leadershipReviewStats.conflicts}</span>.
+            </p>
+          </div>
         </div>
       </div>
 

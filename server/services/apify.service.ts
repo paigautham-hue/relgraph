@@ -6,6 +6,7 @@ import {
   alerts,
   apifyRuns,
   apifySourceConfigs,
+  bankLeadershipRecords,
   domains,
   organizations,
   personIntel,
@@ -13,9 +14,11 @@ import {
   tenures,
   type ApifyRun,
   type ApifySourceConfig,
+  type BankLeadershipRecord,
   type InsertAlert,
   type InsertApifyRun,
   type InsertApifySourceConfig,
+  type InsertBankLeadershipRecord,
   type InsertOrganization,
   type InsertPerson,
   type InsertPersonIntel,
@@ -25,12 +28,15 @@ import type { z } from "zod";
 import {
   apifyCapabilitySchema,
   apifyTargetTypeSchema,
+  bankLeadershipRecordFilterSchema,
   createApifySourceConfigSchema,
   updateApifySourceConfigSchema,
   runApifySourceSchema,
   applyApifyDiscoverySchema,
   applyApifyEnrichmentSchema,
+  importBankLeadershipRecordSchema,
   syncApifyMonitoringSchema,
+  updateBankLeadershipRecordSchema,
 } from "@shared/validation";
 
 export type ApifyCapability = z.infer<typeof apifyCapabilitySchema>;
@@ -41,6 +47,9 @@ export type RunApifySourceInput = z.infer<typeof runApifySourceSchema>;
 export type ApplyApifyDiscoveryInput = z.infer<typeof applyApifyDiscoverySchema>;
 export type ApplyApifyEnrichmentInput = z.infer<typeof applyApifyEnrichmentSchema>;
 export type SyncApifyMonitoringInput = z.infer<typeof syncApifyMonitoringSchema>;
+export type BankLeadershipRecordFilterInput = z.infer<typeof bankLeadershipRecordFilterSchema>;
+export type UpdateBankLeadershipRecordInput = z.infer<typeof updateBankLeadershipRecordSchema>;
+export type ImportBankLeadershipRecordInput = z.infer<typeof importBankLeadershipRecordSchema>;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -267,6 +276,146 @@ function detectChanges(previousItems: NormalizedApifyItem[], nextItems: Normaliz
   return changes;
 }
 
+function normalizeBankLeadershipRole(title: string | null): InsertBankLeadershipRecord["roleType"] {
+  const value = (title ?? "").toLowerCase();
+  if (value.includes("chairman and managing director") || value.includes("chairman & managing director") || value.includes("cmd")) {
+    return "chairman_and_managing_director";
+  }
+  if (value.includes("managing director") || value.includes("md & ceo") || value.includes("md and ceo")) {
+    return "managing_director";
+  }
+  if (value.includes("executive director")) {
+    return "executive_director";
+  }
+  if (value.includes("chairman") || value.includes("chairperson")) {
+    return "chairman";
+  }
+  return "other";
+}
+
+function inferBankLeadershipSourceType(sourceUrl: string | null, record: JsonRecord): InsertBankLeadershipRecord["sourceType"] {
+  const flattened = JSON.stringify(record).toLowerCase();
+  const url = (sourceUrl ?? "").toLowerCase();
+  if (flattened.includes("annual report")) return "annual_report";
+  if (flattened.includes("stock exchange") || url.includes("bseindia") || url.includes("nseindia")) return "stock_exchange_filing";
+  if (flattened.includes("reserve bank of india") || url.includes("rbi.org.in")) return "regulator_publication";
+  if (flattened.includes("ministry") || flattened.includes("government of india") || url.includes("gov.in")) return "government_release";
+  if (flattened.includes("press release")) return "press_release";
+  try {
+    if (sourceUrl) {
+      const hostname = new URL(sourceUrl).hostname.toLowerCase();
+      if (!hostname.includes("linkedin.com") && !hostname.includes("wikipedia.org") && !hostname.includes("twitter.com") && !hostname.includes("x.com")) {
+        return "official_bank_website";
+      }
+    }
+  } catch {
+    // Ignore malformed URLs and fall back to a generic type.
+  }
+  return sourceUrl ? "secondary_reference" : "unknown";
+}
+
+function inferConfidenceLevel(score: number | null | undefined): InsertBankLeadershipRecord["confidenceLevel"] {
+  if (typeof score !== "number") return "medium";
+  if (score >= 0.85) return "high";
+  if (score >= 0.65) return "medium";
+  return "low";
+}
+
+function buildBankLeadershipEvidence(item: NormalizedApifyItem) {
+  const evidence: Array<{ label: string; url?: string; note?: string }> = [];
+  if (item.sourceUrl) {
+    evidence.push({
+      label: "Observed source",
+      url: item.sourceUrl,
+      note: item.summary ?? item.currentTitle ?? undefined,
+    });
+  }
+  if (item.summary) {
+    evidence.push({
+      label: "Normalized summary",
+      note: item.summary,
+    });
+  }
+  if (item.signals.length > 0) {
+    evidence.push({
+      label: "Detected signals",
+      note: item.signals.join(", "),
+    });
+  }
+  return evidence;
+}
+
+function isBankLeadershipCandidate(item: NormalizedApifyItem) {
+  return Boolean(item.personName && item.currentTitle && (normalizeBankLeadershipRole(item.currentTitle) !== "other" || item.signals.length > 0));
+}
+
+async function persistBankLeadershipRecords(params: {
+  runId: string;
+  source: ApifySourceConfig | null;
+  normalized: NormalizedApifyItem[];
+  userId: string;
+}) {
+  const db = getDb();
+  const targetOrganization = params.source?.targetOrganizationId
+    ? (await db.select().from(organizations).where(eq(organizations.id, params.source.targetOrganizationId)).limit(1))[0] ?? null
+    : null;
+
+  const records: InsertBankLeadershipRecord[] = [];
+
+  for (const item of params.normalized) {
+    if (!isBankLeadershipCandidate(item)) continue;
+
+    const matchedOrganization = item.organizationName
+      ? await findOrganizationByName(item.organizationName)
+      : targetOrganization;
+    const sourceUrl = item.sourceUrl ?? matchedOrganization?.website ?? null;
+    const sourceDomain = sourceUrl
+      ? (() => {
+          try {
+            return new URL(sourceUrl).hostname.toLowerCase();
+          } catch {
+            return null;
+          }
+        })()
+      : null;
+
+    records.push({
+      id: randomUUID(),
+      organizationId: matchedOrganization?.id ?? targetOrganization?.id ?? null,
+      apifyRunId: params.runId,
+      sourceConfigId: params.source?.id ?? null,
+      roleType: normalizeBankLeadershipRole(item.currentTitle),
+      personName: item.personName ?? item.title,
+      title: item.currentTitle ?? item.title,
+      normalizedTitle: item.currentTitle ?? null,
+      bankName: matchedOrganization?.name ?? item.organizationName ?? targetOrganization?.name ?? params.source?.name ?? "Unknown bank",
+      bankType: (matchedOrganization?.type ?? "bank") as InsertBankLeadershipRecord["bankType"],
+      sourceUrl: sourceUrl ?? "https://apify.invalid/local-record",
+      sourceDomain,
+      sourceType: inferBankLeadershipSourceType(sourceUrl, item.raw),
+      sourcePublishedDate: null,
+      sourceObservedAt: new Date(),
+      sourceExcerpt: item.summary,
+      sourcePayload: item.raw,
+      validationStatus: "pending_review",
+      confidenceLevel: inferConfidenceLevel(item.confidence),
+      confidenceScore: item.confidence,
+      validationNotes: null,
+      validationEvidence: buildBankLeadershipEvidence(item),
+      isImported: false,
+      importedPersonId: null,
+      importedTenureId: null,
+      createdBy: params.userId,
+    });
+  }
+
+  if (records.length > 0) {
+    await db.insert(bankLeadershipRecords).values(records);
+  }
+
+  return records.length;
+}
+
 async function apifyRequest<T>(path: string, init?: RequestInit): Promise<T> {
   ensureApifyToken();
   const response = await fetch(`${APIFY_API_BASE_URL}${path}`, {
@@ -461,6 +610,8 @@ export async function runApifySource(input: RunApifySourceInput, userId: string)
     targetType: input.targetType ?? source?.targetType ?? "search",
     actorId: input.actorId ?? source?.actorId ?? null,
     actorTaskId: input.actorTaskId ?? source?.actorTaskId ?? null,
+    apifyRunId: null,
+    datasetId: null,
     status: "running",
     query: input.query ?? null,
     startUrls: input.startUrls ?? [],
@@ -468,6 +619,14 @@ export async function runApifySource(input: RunApifySourceInput, userId: string)
     outputPreview: [],
     normalizedOutput: [],
     detectedChanges: [],
+    summary: source?.description ?? null,
+    itemCount: 0,
+    errorMessage: null,
+    sourceSnapshot: source ? JSON.parse(JSON.stringify(source)) : {},
+    executionMeta: {
+      requestedAt: now.toISOString(),
+      requestInput: input,
+    },
     targetOrganizationId: input.targetOrganizationId ?? source?.targetOrganizationId ?? null,
     targetPersonId: input.targetPersonId ?? source?.targetPersonId ?? null,
     initiatedBy: userId,
@@ -493,28 +652,70 @@ export async function runApifySource(input: RunApifySourceInput, userId: string)
     const watchFields = Array.isArray(source?.watchFields) ? source.watchFields.filter((value): value is string => typeof value === "string") : [];
     const detectedChanges = detectChanges(previousNormalized, normalized, watchFields);
 
+    const persistedLeadershipRecordCount = await persistBankLeadershipRecords({
+      runId,
+      source,
+      normalized,
+      userId,
+    });
+
+    const summary = [
+      `${normalized.length} normalized item${normalized.length === 1 ? "" : "s"}`,
+      detectedChanges.length > 0 ? `${detectedChanges.length} detected change${detectedChanges.length === 1 ? "" : "s"}` : null,
+      persistedLeadershipRecordCount > 0 ? `${persistedLeadershipRecordCount} bank leadership review candidate${persistedLeadershipRecordCount === 1 ? "" : "s"}` : null,
+    ].filter(Boolean).join(" • ");
+
     await db.update(apifyRuns).set({
       apifyRunId,
+      datasetId: datasetId ?? null,
       status,
       outputPreview: datasetItems.slice(0, 10),
       normalizedOutput: normalized,
       detectedChanges,
+      summary,
+      itemCount: normalized.length,
+      errorMessage: null,
+      executionMeta: {
+        completedAt: new Date().toISOString(),
+        datasetItemCount: datasetItems.length,
+        persistedLeadershipRecordCount,
+      },
       finishedAt: new Date(),
       updatedAt: new Date(),
     }).where(eq(apifyRuns.id, runId));
 
     if (source?.id) {
-      await db.update(apifySourceConfigs).set({ lastRunAt: new Date(), updatedAt: new Date() }).where(eq(apifySourceConfigs.id, source.id));
+      await db.update(apifySourceConfigs).set({
+        lastRunAt: new Date(),
+        lastRunStatus: status,
+        lastRunSummary: summary,
+        updatedAt: new Date(),
+      }).where(eq(apifySourceConfigs.id, source.id));
     }
 
     return (await getApifyRunById(runId))!;
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown Apify error";
     await db.update(apifyRuns).set({
       status: "failed",
-      outputPreview: [{ error: error instanceof Error ? error.message : "Unknown Apify error" }],
+      outputPreview: [{ error: message }],
+      summary: "Apify run failed before records could be normalized.",
+      errorMessage: message,
+      executionMeta: {
+        failedAt: new Date().toISOString(),
+        message,
+      },
       finishedAt: new Date(),
       updatedAt: new Date(),
     }).where(eq(apifyRuns.id, runId));
+    if (source?.id) {
+      await db.update(apifySourceConfigs).set({
+        lastRunAt: new Date(),
+        lastRunStatus: "failed",
+        lastRunSummary: message,
+        updatedAt: new Date(),
+      }).where(eq(apifySourceConfigs.id, source.id));
+    }
     throw error;
   }
 }
@@ -741,6 +942,153 @@ export async function syncApifyMonitoring(input: SyncApifyMonitoringInput) {
     sourceConfigId: source.id,
     changeCount: changes.length,
     alertsCreated: alertRows.length,
+  };
+}
+
+export async function listBankLeadershipRecords(input: BankLeadershipRecordFilterInput) {
+  const db = getDb();
+  const page = input.page ?? 1;
+  const pageSize = input.pageSize ?? 20;
+  const rows = await db.select().from(bankLeadershipRecords).orderBy(desc(bankLeadershipRecords.createdAt));
+
+  const filtered = rows.filter((row) => {
+    if (input.organizationId && row.organizationId !== input.organizationId) return false;
+    if (input.apifyRunId && row.apifyRunId !== input.apifyRunId) return false;
+    if (input.sourceConfigId && row.sourceConfigId !== input.sourceConfigId) return false;
+    if (input.validationStatus && row.validationStatus !== input.validationStatus) return false;
+    if (input.roleType && row.roleType !== input.roleType) return false;
+    if (input.onlyUnimported && row.isImported) return false;
+    if (input.search) {
+      const query = input.search.toLowerCase();
+      const haystack = `${row.personName} ${row.title} ${row.bankName} ${row.sourceUrl}`.toLowerCase();
+      if (!haystack.includes(query)) return false;
+    }
+    return true;
+  });
+
+  const offset = (page - 1) * pageSize;
+  return {
+    data: filtered.slice(offset, offset + pageSize),
+    total: filtered.length,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(filtered.length / pageSize)),
+  };
+}
+
+export async function getBankLeadershipRecordById(id: string) {
+  const db = getDb();
+  const rows = await db.select().from(bankLeadershipRecords).where(eq(bankLeadershipRecords.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function updateBankLeadershipRecord(input: UpdateBankLeadershipRecordInput) {
+  const db = getDb();
+  const patch: Partial<InsertBankLeadershipRecord> = {
+    updatedAt: new Date(),
+  };
+
+  if (input.validationStatus !== undefined) patch.validationStatus = input.validationStatus;
+  if (input.confidenceLevel !== undefined) patch.confidenceLevel = input.confidenceLevel;
+  if (input.confidenceScore !== undefined) patch.confidenceScore = input.confidenceScore;
+  if (input.validationNotes !== undefined) patch.validationNotes = input.validationNotes;
+  if (input.validationEvidence !== undefined) patch.validationEvidence = input.validationEvidence;
+  if (input.sourceType !== undefined) patch.sourceType = input.sourceType;
+  if (input.sourcePublishedDate !== undefined) {
+    patch.sourcePublishedDate = input.sourcePublishedDate ? new Date(input.sourcePublishedDate) : null;
+  }
+
+  await db.update(bankLeadershipRecords).set(patch).where(eq(bankLeadershipRecords.id, input.id));
+  const updated = await getBankLeadershipRecordById(input.id);
+  if (!updated) {
+    throw new Error("Bank leadership record not found.");
+  }
+  return updated;
+}
+
+export async function importBankLeadershipRecord(input: ImportBankLeadershipRecordInput, userId: string) {
+  const db = getDb();
+  const record = await getBankLeadershipRecordById(input.id);
+  if (!record) {
+    throw new Error("Bank leadership record not found.");
+  }
+
+  let organization = record.organizationId
+    ? (await db.select().from(organizations).where(eq(organizations.id, record.organizationId)).limit(1))[0] ?? null
+    : await findOrganizationByName(record.bankName);
+
+  if (!organization) {
+    if (!input.createOrganizationIfMissing || !input.domainId) {
+      throw new Error("A domain is required to create the bank organization before import.");
+    }
+    organization = await ensureOrganization({
+      name: record.bankName,
+      domainId: input.domainId,
+      website: record.sourceType === "official_bank_website" ? record.sourceUrl : null,
+      type: (record.bankType ?? "bank") as InsertOrganization["type"],
+      city: null,
+    });
+  }
+
+  const personName = input.personNameOverride ?? record.personName;
+  const title = input.titleOverride ?? record.title;
+  let person = await findPersonByNameAndOrg(personName, organization?.id ?? null);
+
+  if (!person) {
+    const personRow: InsertPerson = {
+      id: randomUUID(),
+      name: personName,
+      currentTitle: title,
+      currentOrgId: organization?.id ?? null,
+      category: "banker",
+      photoUrl: null,
+      isTracked: true,
+      createdBy: userId,
+    };
+    await db.insert(persons).values(personRow);
+    person = (await db.select().from(persons).where(eq(persons.id, personRow.id)).limit(1))[0] ?? null;
+  }
+
+  let importedTenureId: string | null = null;
+  if (person && organization) {
+    const existingTenures = await db.select().from(tenures)
+      .where(and(eq(tenures.personId, person.id), eq(tenures.orgId, organization.id)));
+    const existingTenure = existingTenures.find((tenure) => tenure.title === title && Boolean(tenure.isCurrent) === input.markAsCurrent);
+
+    if (existingTenure) {
+      importedTenureId = existingTenure.id;
+    } else {
+      const tenureRow: InsertTenure = {
+        id: randomUUID(),
+        personId: person.id,
+        orgId: organization.id,
+        title,
+        startDate: input.startDate ? new Date(input.startDate) : new Date(),
+        endDate: input.markAsCurrent ? null : null,
+        isCurrent: input.markAsCurrent,
+        source: "auto_scraped",
+        sourceUrl: record.sourceUrl,
+        createdBy: userId,
+      };
+      await db.insert(tenures).values(tenureRow);
+      importedTenureId = tenureRow.id;
+    }
+  }
+
+  await db.update(bankLeadershipRecords).set({
+    organizationId: organization?.id ?? record.organizationId ?? null,
+    validationStatus: "imported",
+    isImported: true,
+    importedPersonId: person?.id ?? null,
+    importedTenureId,
+    updatedAt: new Date(),
+  }).where(eq(bankLeadershipRecords.id, input.id));
+
+  return {
+    record: await getBankLeadershipRecordById(input.id),
+    organization,
+    person,
+    importedTenureId,
   };
 }
 

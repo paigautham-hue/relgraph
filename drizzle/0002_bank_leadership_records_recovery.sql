@@ -1,0 +1,41 @@
+CREATE TABLE IF NOT EXISTS `bank_leadership_records` (
+  `id` varchar(36) NOT NULL,
+  `organization_id` varchar(36) NULL,
+  `apify_run_id` varchar(36) NULL,
+  `source_config_id` varchar(36) NULL,
+  `role_type` enum('chairman','managing_director','chairman_and_managing_director','executive_director','other') NOT NULL DEFAULT 'other',
+  `person_name` varchar(255) NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `normalized_title` varchar(255) NULL,
+  `bank_name` varchar(255) NOT NULL,
+  `bank_type` enum('bank','company','regulator','industry_body','government','investor','other') NULL,
+  `source_url` text NOT NULL,
+  `source_domain` varchar(255) NULL,
+  `source_type` enum('official_bank_website','stock_exchange_filing','regulator_publication','government_release','annual_report','press_release','secondary_reference','unknown') NOT NULL DEFAULT 'unknown',
+  `source_published_date` date NULL,
+  `source_observed_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `source_excerpt` text NULL,
+  `source_payload` json NOT NULL,
+  `validation_status` enum('pending_review','official_source_confirmed','secondary_source_only','conflict_detected','rejected','imported') NOT NULL DEFAULT 'pending_review',
+  `confidence_level` enum('low','medium','high') NOT NULL DEFAULT 'medium',
+  `confidence_score` double NULL,
+  `validation_notes` text NULL,
+  `validation_evidence` json NOT NULL,
+  `is_imported` boolean NOT NULL DEFAULT false,
+  `imported_person_id` varchar(36) NULL,
+  `imported_tenure_id` varchar(36) NULL,
+  `created_by` int NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT `bank_leadership_records_id` PRIMARY KEY(`id`),
+  CONSTRAINT `blr_org_fk` FOREIGN KEY (`organization_id`) REFERENCES `organizations`(`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `blr_run_fk` FOREIGN KEY (`apify_run_id`) REFERENCES `apify_runs`(`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `blr_source_fk` FOREIGN KEY (`source_config_id`) REFERENCES `apify_source_configs`(`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `blr_person_fk` FOREIGN KEY (`imported_person_id`) REFERENCES `persons`(`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `blr_tenure_fk` FOREIGN KEY (`imported_tenure_id`) REFERENCES `tenures`(`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `blr_user_fk` FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+CREATE INDEX `bank_leadership_org_idx` ON `bank_leadership_records` (`organization_id`, `validation_status`, `created_at`);
+CREATE INDEX `bank_leadership_run_idx` ON `bank_leadership_records` (`apify_run_id`, `created_at`);
+CREATE INDEX `bank_leadership_source_idx` ON `bank_leadership_records` (`source_config_id`, `role_type`, `created_at`);
