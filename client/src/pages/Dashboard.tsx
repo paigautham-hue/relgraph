@@ -98,9 +98,9 @@ export default function Dashboard() {
 
   const stats = statsQuery.data;
   const loading = statsQuery.isLoading;
+  const statsAny = (stats as any) ?? {};
 
-  // Fallback chart data when API doesn't return it
-  const strengthDistribution = (stats as any)?.strengthDistribution ?? [
+  const fallbackStrengthDistribution = [
     { name: "Dormant", value: 12 },
     { name: "Acquaintance", value: 28 },
     { name: "Active", value: 35 },
@@ -108,16 +108,41 @@ export default function Dashboard() {
     { name: "Champion", value: 7 },
   ];
 
-  const monthlyInteractions = (stats as any)?.monthlyInteractions ?? [
-    { month: "Oct", count: 42 },
-    { month: "Nov", count: 58 },
-    { month: "Dec", count: 35 },
-    { month: "Jan", count: 64 },
-    { month: "Feb", count: 71 },
-    { month: "Mar", count: 89 },
-  ];
+  const rawStrengthDistribution = statsAny.strengthDistribution;
+  const strengthDistribution = Array.isArray(rawStrengthDistribution)
+    ? rawStrengthDistribution
+        .map((item: any) => ({
+          name: item?.name ?? item?.label ?? "Unknown",
+          value: Number(item?.value ?? item?.count ?? 0),
+        }))
+        .filter((item) => Number.isFinite(item.value))
+    : rawStrengthDistribution && typeof rawStrengthDistribution === "object"
+      ? Object.entries(rawStrengthDistribution).map(([label, value]) => ({
+          name: label
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, (char) => char.toUpperCase()),
+          value: Number(value ?? 0),
+        }))
+      : fallbackStrengthDistribution;
 
-  const recentActivity = (stats as any)?.recentActivity ?? [];
+  const rawMonthlyInteractions = statsAny.monthlyInteractions;
+  const monthlyInteractions = Array.isArray(rawMonthlyInteractions)
+    ? rawMonthlyInteractions.map((item: any) => ({
+        month: item?.month ?? item?.label ?? "Unknown",
+        count: Number(item?.count ?? item?.value ?? 0),
+      }))
+    : [
+        { month: "Oct", count: 42 },
+        { month: "Nov", count: 58 },
+        { month: "Dec", count: 35 },
+        { month: "Jan", count: 64 },
+        { month: "Feb", count: 71 },
+        { month: "Mar", count: 89 },
+      ];
+
+  const recentActivity = Array.isArray(statsAny?.recentActivity)
+    ? statsAny.recentActivity
+    : [];
 
   return (
     <div className="space-y-6">
