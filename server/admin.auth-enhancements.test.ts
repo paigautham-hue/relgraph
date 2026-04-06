@@ -6,6 +6,10 @@ import type { TrpcContext } from "./_core/context";
 const authServiceMocks = vi.hoisted(() => ({
   normalizeEmail: vi.fn((email: string) => email.trim().toLowerCase()),
   getAccessRequestByEmail: vi.fn(),
+  getPendingRegistrationByEmail: vi.fn(),
+  getUserByEmail: vi.fn(),
+  updateManagedUserStatus: vi.fn(),
+  listUsersByLoginMethod: vi.fn(),
 }));
 
 const auditMocks = vi.hoisted(() => ({
@@ -23,6 +27,10 @@ vi.mock("./services/auth.service", async () => {
     ...actual,
     normalizeEmail: authServiceMocks.normalizeEmail,
     getAccessRequestByEmail: authServiceMocks.getAccessRequestByEmail,
+    getPendingRegistrationByEmail: authServiceMocks.getPendingRegistrationByEmail,
+    getUserByEmail: authServiceMocks.getUserByEmail,
+    updateManagedUserStatus: authServiceMocks.updateManagedUserStatus,
+    listUsersByLoginMethod: authServiceMocks.listUsersByLoginMethod,
     RESERVED_SUPER_ADMIN_EMAIL: "gautham@manipalgroup.info",
     ACCESS_REQUEST_LOGIN_METHOD: "access_request",
     PENDING_ALLOWLIST_LOGIN_METHOD: "allowlist_pending",
@@ -103,9 +111,83 @@ beforeEach(() => {
   vi.clearAllMocks();
   dbState.current = null;
   auditMocks.logAudit.mockResolvedValue(undefined);
+  authServiceMocks.getPendingRegistrationByEmail.mockReset();
+  authServiceMocks.getUserByEmail.mockReset();
+  authServiceMocks.updateManagedUserStatus.mockReset();
+  authServiceMocks.listUsersByLoginMethod.mockReset();
 });
 
 describe("admin authentication enhancements", () => {
+  it("adds an approved email without querying brittle Drizzle auth columns", async () => {
+    const ctx = createAdminContext();
+    const caller = appRouter.createCaller(ctx);
+
+    authServiceMocks.getPendingRegistrationByEmail.mockResolvedValue(null);
+    authServiceMocks.getUserByEmail.mockResolvedValue(null);
+
+    const result = await caller.admin.addRegistrationAllowlistEmail({
+      email: "rajesh.shet@manipalgroup.info",
+      role: "viewer",
+    });
+
+    expect(result).toEqual({
+      id: expect.any(String),
+      email: "rajesh.shet@manipalgroup.info",
+      role: "viewer",
+      invitedBy: "admin-1",
+    });
+    expect(authServiceMocks.getPendingRegistrationByEmail).toHaveBeenCalledWith("rajesh.shet@manipalgroup.info");
+    expect(authServiceMocks.getUserByEmail).toHaveBeenCalledWith("rajesh.shet@manipalgroup.info");
+    expect(auditMocks.logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "admin-1",
+        entityType: "user",
+        ipAddress: "203.0.113.42",
+      }),
+    );
+  });
+
+  it("updates an existing pending approved email through the compatibility helper", async () => {
+    const ctx = createAdminContext();
+    const caller = appRouter.createCaller(ctx);
+
+    authServiceMocks.getPendingRegistrationByEmail.mockResolvedValue({
+      id: "pending-1",
+      email: "rajesh.shet@manipalgroup.info",
+      role: "viewer",
+      invitedBy: null,
+    });
+    authServiceMocks.getUserByEmail.mockResolvedValue({
+      id: "pending-1",
+      email: "rajesh.shet@manipalgroup.info",
+      loginMethod: "allowlist_pending",
+    });
+    authServiceMocks.updateManagedUserStatus.mockResolvedValue({
+      id: "pending-1",
+      email: "rajesh.shet@manipalgroup.info",
+      role: "manager",
+      invitedBy: "admin-1",
+    });
+
+    const result = await caller.admin.addRegistrationAllowlistEmail({
+      email: "rajesh.shet@manipalgroup.info",
+      role: "manager",
+    });
+
+    expect(authServiceMocks.updateManagedUserStatus).toHaveBeenCalledWith("pending-1", {
+      role: "manager",
+      invitedBy: "admin-1",
+      loginMethod: "allowlist_pending",
+      isActive: true,
+    });
+    expect(result).toEqual({
+      id: "pending-1",
+      email: "rajesh.shet@manipalgroup.info",
+      role: "manager",
+      invitedBy: "admin-1",
+    });
+  });
+
   it("bulk approves selected access requests and logs auth approval outcomes", async () => {
     const ctx = createAdminContext();
     const caller = appRouter.createCaller(ctx);
@@ -128,6 +210,9 @@ describe("admin authentication enhancements", () => {
     authServiceMocks.getAccessRequestByEmail
       .mockResolvedValueOnce({ id: "req-1", email: "first@example.com", role: "viewer" })
       .mockResolvedValueOnce({ id: "req-2", email: "second@example.com", role: "viewer" });
+    authServiceMocks.updateManagedUserStatus
+      .mockResolvedValueOnce({ id: "req-1", email: "first@example.com", role: "manager", invitedBy: "admin-1" })
+      .mockResolvedValueOnce({ id: "req-2", email: "second@example.com", role: "viewer", invitedBy: "admin-1" });
 
     const result = await caller.admin.bulkApproveAccessRequests({
       requests: [
@@ -154,7 +239,7 @@ describe("admin authentication enhancements", () => {
         },
       ],
     });
-    expect(dbMock.spies.update).toHaveBeenCalledTimes(2);
+    expect(authServiceMocks.updateManagedUserStatus).toHaveBeenCalledTimes(2);
     expect(auditMocks.logAudit).toHaveBeenCalledTimes(2);
 
     const firstAuditCall = auditMocks.logAudit.mock.calls[0]?.[0];

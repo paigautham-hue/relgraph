@@ -232,6 +232,12 @@ async function selectOneBy(statement: string, params: unknown[]): Promise<AuthUs
   return syncReservedRole(mapUserRow(rows[0]));
 }
 
+async function selectManyBy(statement: string, params: unknown[] = []): Promise<AuthUser[]> {
+  await ensureUsersAuthCompatibility();
+  const rows = await queryRows<UserRow>(statement, params);
+  return Promise.all(rows.map((row) => syncReservedRole(mapUserRow(row))));
+}
+
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, SALT_ROUNDS);
 }
@@ -355,6 +361,51 @@ export async function isEmailApprovedForRegistration(email: string): Promise<boo
 
   const pendingUser = await getPendingRegistrationByEmail(email);
   return Boolean(pendingUser);
+}
+
+export async function listUsersByLoginMethod(
+  loginMethod: string,
+  options: { sortByCreatedAt?: "asc" | "desc" } = {},
+): Promise<AuthUser[]> {
+  const direction = options.sortByCreatedAt === "asc" ? "asc" : "desc";
+  return selectManyBy(`select * from users where loginMethod = ? order by createdAt ${direction}`, [loginMethod]);
+}
+
+export async function updateManagedUserStatus(
+  userId: string,
+  data: {
+    role?: string;
+    invitedBy?: string | null;
+    loginMethod?: string | null;
+    isActive?: boolean;
+  },
+): Promise<AuthUser> {
+  await ensureUsersAuthCompatibility();
+
+  const existing = await getUserById(userId);
+  if (!existing) {
+    throw new Error(`User ${userId} not found`);
+  }
+
+  const now = new Date();
+  await executeStatement(
+    "update users set role = ?, invitedBy = ?, loginMethod = ?, isActive = ?, updatedAt = ? where id = ?",
+    [
+      resolveManagedRole(existing.email, data.role ?? existing.role),
+      data.invitedBy ?? existing.invitedBy,
+      data.loginMethod ?? existing.loginMethod,
+      data.isActive ?? existing.isActive,
+      now,
+      userId,
+    ],
+  );
+
+  const updated = await getUserById(userId);
+  if (!updated) {
+    throw new Error(`Failed to load updated user ${userId}`);
+  }
+
+  return updated;
 }
 
 export async function createUser(data: {

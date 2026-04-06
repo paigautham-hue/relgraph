@@ -19,10 +19,13 @@ import {
   createUser,
   getAccessRequestByEmail,
   getPendingRegistrationByEmail,
+  getUserByEmail,
   hashPassword,
+  listUsersByLoginMethod,
   normalizeEmail,
   PENDING_ALLOWLIST_LOGIN_METHOD,
   RESERVED_SUPER_ADMIN_EMAIL,
+  updateManagedUserStatus,
 } from "../services/auth.service";
 import {
   getContactImportTemplateFieldLibrary,
@@ -181,37 +184,30 @@ export const adminRouter = router({
     }),
 
   listRegistrationAllowlist: adminProcedure.query(async () => {
-    const db = getDb();
-    const rows = await db
-      .select({
-        id: users.id,
-        email: users.email,
-        role: users.role,
-        invitedBy: users.invitedBy,
-        createdAt: users.createdAt,
-      })
-      .from(users)
-      .where(eq(users.loginMethod, PENDING_ALLOWLIST_LOGIN_METHOD))
-      .orderBy(asc(users.email));
+    const rows = await listUsersByLoginMethod(PENDING_ALLOWLIST_LOGIN_METHOD, { sortByCreatedAt: "asc" });
 
-    return rows;
+    return rows
+      .slice()
+      .sort((left, right) => left.email.localeCompare(right.email))
+      .map((row) => ({
+        id: row.id,
+        email: row.email,
+        role: row.role,
+        invitedBy: row.invitedBy,
+        createdAt: row.createdAt,
+      }));
   }),
 
   listAccessRequests: adminProcedure.query(async () => {
-    const db = getDb();
-    const rows = await db
-      .select({
-        id: users.id,
-        email: users.email,
-        name: users.name,
-        role: users.role,
-        createdAt: users.createdAt,
-      })
-      .from(users)
-      .where(eq(users.loginMethod, ACCESS_REQUEST_LOGIN_METHOD))
-      .orderBy(desc(users.createdAt));
+    const rows = await listUsersByLoginMethod(ACCESS_REQUEST_LOGIN_METHOD, { sortByCreatedAt: "desc" });
 
-    return rows;
+    return rows.map((row) => ({
+      id: row.id,
+      email: row.email,
+      name: row.name,
+      role: row.role,
+      createdAt: row.createdAt,
+    }));
   }),
 
   approveAccessRequest: adminProcedure
@@ -221,33 +217,17 @@ export const adminRouter = router({
       requireSuperAdminForReservedIdentity(email, ctx.user.role);
       requireSuperAdminForSuperAdminRole(input.role, ctx.user.role);
 
-      const db = getDb();
       const requestUser = await getAccessRequestByEmail(email);
       if (!requestUser) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Access request not found" });
       }
 
-      await db
-        .update(users)
-        .set({
-          role: input.role as any,
-          invitedBy: ctx.user.id,
-          loginMethod: PENDING_ALLOWLIST_LOGIN_METHOD,
-          isActive: true,
-          updatedAt: new Date(),
-        })
-        .where(eq(users.id, requestUser.id));
-
-      const [updated] = await db
-        .select({
-          id: users.id,
-          email: users.email,
-          role: users.role,
-          invitedBy: users.invitedBy,
-        })
-        .from(users)
-        .where(eq(users.id, requestUser.id))
-        .limit(1);
+      const updated = await updateManagedUserStatus(requestUser.id, {
+        role: input.role,
+        invitedBy: ctx.user.id,
+        loginMethod: PENDING_ALLOWLIST_LOGIN_METHOD,
+        isActive: true,
+      });
 
       logAudit({
         userId: ctx.user.id,
@@ -296,7 +276,6 @@ export const adminRouter = router({
   bulkApproveAccessRequests: adminProcedure
     .input(bulkAccessRequestApprovalSchema)
     .mutation(async ({ input, ctx }) => {
-      const db = getDb();
       const approved: Array<{ id: string; email: string; role: string; invitedBy: string | null }> = [];
 
       for (const request of input.requests) {
@@ -309,27 +288,19 @@ export const adminRouter = router({
           throw new TRPCError({ code: "NOT_FOUND", message: `Access request not found for ${email}` });
         }
 
-        await db
-          .update(users)
-          .set({
-            role: request.role as any,
-            invitedBy: ctx.user.id,
-            loginMethod: PENDING_ALLOWLIST_LOGIN_METHOD,
-            isActive: true,
-            updatedAt: new Date(),
-          })
-          .where(eq(users.id, requestUser.id));
+        const updatedUser = await updateManagedUserStatus(requestUser.id, {
+          role: request.role,
+          invitedBy: ctx.user.id,
+          loginMethod: PENDING_ALLOWLIST_LOGIN_METHOD,
+          isActive: true,
+        });
 
-        const [updated] = await db
-          .select({
-            id: users.id,
-            email: users.email,
-            role: users.role,
-            invitedBy: users.invitedBy,
-          })
-          .from(users)
-          .where(eq(users.id, requestUser.id))
-          .limit(1);
+        const updated = {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          role: updatedUser.role,
+          invitedBy: updatedUser.invitedBy,
+        };
 
         logAudit({
           userId: ctx.user.id,
@@ -397,14 +368,10 @@ export const adminRouter = router({
       requireSuperAdminForReservedIdentity(email, ctx.user.role);
       requireSuperAdminForSuperAdminRole(input.role, ctx.user.role);
 
-      const db = getDb();
-      const [existingUser] = await db
-        .select({ id: users.id, loginMethod: users.loginMethod })
-        .from(users)
-        .where(eq(users.email, email))
-        .limit(1);
+      const existingUser = await getPendingRegistrationByEmail(email);
+      const existingAccount = await getUserByEmail(email);
 
-      if (existingUser && existingUser.loginMethod !== PENDING_ALLOWLIST_LOGIN_METHOD) {
+      if (existingAccount && existingAccount.loginMethod !== PENDING_ALLOWLIST_LOGIN_METHOD) {
         throw new TRPCError({
           code: "CONFLICT",
           message: "A user with this email already exists",
@@ -412,23 +379,19 @@ export const adminRouter = router({
       }
 
       if (existingUser) {
-        await db
-          .update(users)
-          .set({ role: input.role as any, invitedBy: ctx.user.id, updatedAt: new Date() })
-          .where(eq(users.id, existingUser.id));
+        const updated = await updateManagedUserStatus(existingUser.id, {
+          role: input.role,
+          invitedBy: ctx.user.id,
+          loginMethod: PENDING_ALLOWLIST_LOGIN_METHOD,
+          isActive: true,
+        });
 
-        const [updated] = await db
-          .select({
-            id: users.id,
-            email: users.email,
-            role: users.role,
-            invitedBy: users.invitedBy,
-          })
-          .from(users)
-          .where(eq(users.id, existingUser.id))
-          .limit(1);
-
-        return updated;
+        return {
+          id: updated.id,
+          email: updated.email,
+          role: updated.role,
+          invitedBy: updated.invitedBy,
+        };
       }
 
       const created = await createUser({
