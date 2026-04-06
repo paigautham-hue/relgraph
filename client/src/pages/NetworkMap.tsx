@@ -144,11 +144,11 @@ export default function NetworkMap() {
 
   // Data queries
   const personsQuery = trpc.persons.list.useQuery(
-    { page: 1, pageSize: 500 },
+    { page: 1, pageSize: 100 },
     { refetchOnWindowFocus: false }
   );
   const relsQuery = trpc.relationships.list.useQuery(
-    { page: 1, pageSize: 1000 },
+    { page: 1, pageSize: 100 },
     { refetchOnWindowFocus: false }
   );
   const domainsQuery = trpc.domains.list.useQuery(undefined, {

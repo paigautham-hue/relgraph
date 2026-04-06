@@ -371,6 +371,37 @@ export async function listUsersByLoginMethod(
   return selectManyBy(`select * from users where loginMethod = ? order by createdAt ${direction}`, [loginMethod]);
 }
 
+export async function listManagedUsers(options: {
+  search?: string;
+  role?: string;
+  isActive?: boolean;
+  sortOrder?: "asc" | "desc";
+} = {}): Promise<AuthUser[]> {
+  const clauses: string[] = [];
+  const params: unknown[] = [];
+
+  if (options.search?.trim()) {
+    const pattern = `%${options.search.trim()}%`;
+    clauses.push("(name like ? or email like ?)");
+    params.push(pattern, pattern);
+  }
+
+  if (options.role) {
+    clauses.push("role = ?");
+    params.push(normalizeStoredRole(options.role));
+  }
+
+  if (options.isActive !== undefined) {
+    clauses.push("isActive = ?");
+    params.push(options.isActive);
+  }
+
+  const whereClause = clauses.length > 0 ? ` where ${clauses.join(" and ")}` : "";
+  const orderClause = options.sortOrder === "asc" ? " order by name asc" : " order by createdAt desc";
+
+  return selectManyBy(`select * from users${whereClause}${orderClause}`, params);
+}
+
 export async function updateManagedUserStatus(
   userId: string,
   data: {
@@ -408,6 +439,62 @@ export async function updateManagedUserStatus(
   return updated;
 }
 
+export async function updateManagedUserProfile(
+  userId: string,
+  data: {
+    name?: string;
+    role?: string;
+    avatarUrl?: string | null;
+    isActive?: boolean;
+  },
+): Promise<AuthUser> {
+  await ensureUsersAuthCompatibility();
+
+  const existing = await getUserById(userId);
+  if (!existing) {
+    throw new Error(`User ${userId} not found`);
+  }
+
+  const assignments: string[] = [];
+  const params: unknown[] = [];
+
+  if (data.name !== undefined) {
+    assignments.push("name = ?");
+    params.push(data.name.trim() || existing.name);
+  }
+
+  if (data.role !== undefined) {
+    assignments.push("role = ?");
+    params.push(resolveManagedRole(existing.email, data.role));
+  }
+
+  if (data.avatarUrl !== undefined) {
+    assignments.push("avatarUrl = ?");
+    params.push(data.avatarUrl);
+  }
+
+  if (data.isActive !== undefined) {
+    assignments.push("isActive = ?");
+    params.push(data.isActive);
+  }
+
+  if (assignments.length === 0) {
+    return existing;
+  }
+
+  assignments.push("updatedAt = ?");
+  params.push(new Date(), userId);
+
+  await executeStatement(`update users set ${assignments.join(", ")} where id = ?`, params);
+
+  const updated = await getUserById(userId);
+  if (!updated) {
+    throw new Error(`Failed to load updated user ${userId}`);
+  }
+
+  return updated;
+}
+
 export async function createUser(data: {
   email: string;
   name?: string;
@@ -425,38 +512,74 @@ export async function createUser(data: {
   const now = new Date();
   const role = resolveManagedRole(normalizedEmail, data.role);
 
-  const [result] = await getPool().query(
-    `
-      insert into users (
-        email,
-        name,
-        passwordHash,
-        role,
-        openId,
-        loginMethod,
-        invitedBy,
-        isActive,
-        createdAt,
-        updatedAt,
-        lastSignedIn
-      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `,
-    [
-      normalizedEmail,
-      data.name?.trim() || deriveDisplayNameFromEmail(normalizedEmail),
-      passwordHash,
-      role,
-      data.openId ?? null,
-      data.loginMethod ?? null,
-      data.invitedBy ?? null,
-      data.isActive ?? true,
-      now,
-      now,
-      now,
-    ] as any,
-  ) as [ResultSetHeader, any];
+  const userId = crypto.randomUUID();
+  const insertValues = [
+    userId,
+    normalizedEmail,
+    data.name?.trim() || deriveDisplayNameFromEmail(normalizedEmail),
+    passwordHash,
+    role,
+    data.openId ?? null,
+    data.loginMethod ?? null,
+    data.invitedBy ?? null,
+    data.isActive ?? true,
+    now,
+    now,
+    now,
+  ] as any;
 
-  const inserted = await getUserById(String(result.insertId));
+  try {
+    await getPool().query(
+      `
+        insert into users (
+          id,
+          email,
+          name,
+          passwordHash,
+          role,
+          openId,
+          loginMethod,
+          invitedBy,
+          isActive,
+          createdAt,
+          updatedAt,
+          lastSignedIn
+        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      insertValues,
+    );
+  } catch (error: any) {
+    const shouldFallbackToLegacyInsert =
+      error?.code === "ER_TRUNCATED_WRONG_VALUE_FOR_FIELD" ||
+      error?.code === "ER_BAD_NULL_ERROR" ||
+      String(error?.message ?? "").includes("column 'id'") ||
+      String(error?.sqlMessage ?? "").includes("column 'id'");
+
+    if (!shouldFallbackToLegacyInsert) {
+      throw error;
+    }
+
+    await getPool().query(
+      `
+        insert into users (
+          email,
+          name,
+          passwordHash,
+          role,
+          openId,
+          loginMethod,
+          invitedBy,
+          isActive,
+          createdAt,
+          updatedAt,
+          lastSignedIn
+        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      insertValues.slice(1),
+    );
+  }
+
+  const inserted = (await getUserById(userId)) ?? (await getUserByEmail(normalizedEmail));
   if (!inserted) {
     throw new Error("Failed to load newly created user");
   }

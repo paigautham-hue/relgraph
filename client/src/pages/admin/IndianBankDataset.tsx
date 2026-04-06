@@ -219,13 +219,13 @@ export default function IndianBankDataset() {
             <div className="rounded-2xl bg-muted/40 p-4">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Public sector</p>
               <p className="mt-2 text-2xl font-semibold text-foreground">
-                {bankTargets.filter((bank: any) => bank.type === "public_sector").length}
+                {bankTargets.filter((bank: any) => bank.type === "psu_bank").length}
               </p>
             </div>
             <div className="rounded-2xl bg-muted/40 p-4">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Private sector</p>
               <p className="mt-2 text-2xl font-semibold text-foreground">
-                {bankTargets.filter((bank: any) => bank.type === "private_sector").length}
+                {bankTargets.filter((bank: any) => bank.type === "private_bank").length}
               </p>
             </div>
           </div>

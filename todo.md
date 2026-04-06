@@ -65,3 +65,14 @@
 - [x] Fix the dashboard strengthDistribution runtime error so the dashboard can render safely when the API returns a non-array payload
 - [x] Fix the approved-email allowlist query failure caused by the missing login_method column in the live users table
 - [x] Fix the domain-management add-domain failure caused by the current database insert/schema mismatch in the admin flow
+- [ ] Run a comprehensive quality check across RelGraph core flows, admin tools, database-backed features, and navigation to find and fix additional bugs
+- [ ] Fix the admin registration-allowlist and access-request list failures caused by remaining legacy loginMethod queries against the live users schema
+- [ ] Fix the missing audit_log persistence path so admin and system actions do not emit database errors during normal operation
+- [x] Fix the Indian Bank Dataset seed-organizations failure so selecting bank rows can create organizations without database query errors
+- [x] Fix the Apify and bank-dataset data-view flows so important records render reliably during authenticated QA
+- [x] Fix oversized frontend pageSize requests so core data views like People and Network Map stop failing validation during the QA sweep
+- [x] Reproduce and fix the People page organization loader failure caused by requesting more than the allowed maximum page size
+- [x] Reproduce and fix the Network Map data loader failure caused by oversized person and relationship page size requests
+- [x] Reproduce and fix the Indian Bank Dataset data-view and seed-organizations failures in the authenticated admin flow
+- [x] Reproduce and fix the Apify management data-view or run-flow failures in the authenticated admin flow
+- [x] Add regression coverage for the repaired pagination-sensitive RelGraph data views

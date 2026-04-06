@@ -205,7 +205,7 @@ export default function PersonList() {
   const organizationsQuery = trpc.organizations.list.useQuery(
     {
       page: 1,
-      pageSize: 500,
+      pageSize: 100,
       sortOrder: "asc",
     } as any,
     { refetchOnWindowFocus: false },

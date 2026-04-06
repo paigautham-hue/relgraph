@@ -8,7 +8,10 @@ const authServiceMocks = vi.hoisted(() => ({
   getAccessRequestByEmail: vi.fn(),
   getPendingRegistrationByEmail: vi.fn(),
   getUserByEmail: vi.fn(),
+  getUserById: vi.fn(),
+  updateManagedUserProfile: vi.fn(),
   updateManagedUserStatus: vi.fn(),
+  listManagedUsers: vi.fn(),
   listUsersByLoginMethod: vi.fn(),
 }));
 
@@ -29,7 +32,10 @@ vi.mock("./services/auth.service", async () => {
     getAccessRequestByEmail: authServiceMocks.getAccessRequestByEmail,
     getPendingRegistrationByEmail: authServiceMocks.getPendingRegistrationByEmail,
     getUserByEmail: authServiceMocks.getUserByEmail,
+    getUserById: authServiceMocks.getUserById,
+    updateManagedUserProfile: authServiceMocks.updateManagedUserProfile,
     updateManagedUserStatus: authServiceMocks.updateManagedUserStatus,
+    listManagedUsers: authServiceMocks.listManagedUsers,
     listUsersByLoginMethod: authServiceMocks.listUsersByLoginMethod,
     RESERVED_SUPER_ADMIN_EMAIL: "gautham@manipalgroup.info",
     ACCESS_REQUEST_LOGIN_METHOD: "access_request",
@@ -113,7 +119,10 @@ beforeEach(() => {
   auditMocks.logAudit.mockResolvedValue(undefined);
   authServiceMocks.getPendingRegistrationByEmail.mockReset();
   authServiceMocks.getUserByEmail.mockReset();
+  authServiceMocks.getUserById.mockReset();
+  authServiceMocks.updateManagedUserProfile.mockReset();
   authServiceMocks.updateManagedUserStatus.mockReset();
+  authServiceMocks.listManagedUsers.mockReset();
   authServiceMocks.listUsersByLoginMethod.mockReset();
 });
 
@@ -186,6 +195,113 @@ describe("admin authentication enhancements", () => {
       role: "manager",
       invitedBy: "admin-1",
     });
+  });
+
+  it("lists approved registration emails through the compatibility helper", async () => {
+    const ctx = createAdminContext();
+    const caller = appRouter.createCaller(ctx);
+
+    authServiceMocks.listUsersByLoginMethod.mockResolvedValue([
+      {
+        id: "allow-2",
+        email: "zeta@example.com",
+        role: "viewer",
+        invitedBy: "admin-1",
+        createdAt: new Date("2026-04-02T00:00:00Z"),
+      },
+      {
+        id: "allow-1",
+        email: "alpha@example.com",
+        role: "manager",
+        invitedBy: null,
+        createdAt: new Date("2026-04-01T00:00:00Z"),
+      },
+    ]);
+
+    const result = await caller.admin.listRegistrationAllowlist();
+
+    expect(authServiceMocks.listUsersByLoginMethod).toHaveBeenCalledWith("allowlist_pending", { sortByCreatedAt: "asc" });
+    expect(result.map((row: any) => row.email)).toEqual(["alpha@example.com", "zeta@example.com"]);
+  });
+
+  it("lists access requests through the compatibility helper", async () => {
+    const ctx = createAdminContext();
+    const caller = appRouter.createCaller(ctx);
+
+    authServiceMocks.listUsersByLoginMethod.mockResolvedValue([
+      {
+        id: "req-1",
+        email: "requester@example.com",
+        name: "Requester",
+        role: "viewer",
+        createdAt: new Date("2026-04-03T00:00:00Z"),
+      },
+    ]);
+
+    const result = await caller.admin.listAccessRequests();
+
+    expect(authServiceMocks.listUsersByLoginMethod).toHaveBeenCalledWith("access_request", { sortByCreatedAt: "desc" });
+    expect(result).toEqual([
+      {
+        id: "req-1",
+        email: "requester@example.com",
+        name: "Requester",
+        role: "viewer",
+        createdAt: new Date("2026-04-03T00:00:00Z"),
+      },
+    ]);
+  });
+
+  it("lists users through the compatibility helper instead of brittle Drizzle auth columns", async () => {
+    const ctx = createAdminContext();
+    const caller = appRouter.createCaller(ctx);
+
+    authServiceMocks.listManagedUsers.mockResolvedValue([
+      {
+        id: "user-1",
+        email: "alpha@example.com",
+        name: "Alpha",
+        role: "viewer",
+        avatarUrl: null,
+        isActive: true,
+        lastActiveAt: null,
+        createdAt: new Date("2026-04-01T00:00:00Z"),
+      },
+      {
+        id: "user-2",
+        email: "beta@example.com",
+        name: "Beta",
+        role: "manager",
+        avatarUrl: null,
+        isActive: false,
+        lastActiveAt: null,
+        createdAt: new Date("2026-04-02T00:00:00Z"),
+      },
+    ]);
+
+    const result = await caller.admin.listUsers({
+      page: 1,
+      pageSize: 20,
+      search: undefined,
+      role: undefined,
+      isActive: undefined,
+      sortOrder: "desc",
+    });
+
+    expect(authServiceMocks.listManagedUsers).toHaveBeenCalledWith({
+      search: undefined,
+      role: undefined,
+      isActive: undefined,
+      sortOrder: "desc",
+    });
+    expect(result.total).toBe(2);
+    expect(result.data).toHaveLength(2);
+    expect(result.data[0]).toEqual(
+      expect.objectContaining({
+        id: "user-1",
+        email: "alpha@example.com",
+      }),
+    );
   });
 
   it("bulk approves selected access requests and logs auth approval outcomes", async () => {

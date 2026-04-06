@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, asc, count, desc, eq, like } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, adminProcedure } from "../_core/trpc";
 import {
@@ -20,11 +20,13 @@ import {
   getAccessRequestByEmail,
   getPendingRegistrationByEmail,
   getUserByEmail,
-  hashPassword,
+  getUserById,
+  listManagedUsers,
   listUsersByLoginMethod,
   normalizeEmail,
   PENDING_ALLOWLIST_LOGIN_METHOD,
   RESERVED_SUPER_ADMIN_EMAIL,
+  updateManagedUserProfile,
   updateManagedUserStatus,
 } from "../services/auth.service";
 import {
@@ -61,36 +63,27 @@ function requireSuperAdminForSuperAdminRole(targetRole: string | undefined, acto
 
 export const adminRouter = router({
   listUsers: adminProcedure.input(userFilterSchema).query(async ({ input }) => {
-    const db = getDb();
     const { page, pageSize, search, role, isActive, sortOrder } = input;
     const offset = (page - 1) * pageSize;
 
-    const conditions: ReturnType<typeof eq>[] = [];
-    if (search) conditions.push(like(users.name, `%${search}%`));
-    if (role) conditions.push(eq(users.role, role as any));
-    if (isActive !== undefined) conditions.push(eq(users.isActive, isActive));
+    const rows = await listManagedUsers({
+      search,
+      role,
+      isActive,
+      sortOrder,
+    });
 
-    const where = conditions.length > 0 ? and(...conditions) : undefined;
-
-    const [data, [{ total }]] = await Promise.all([
-      db
-        .select({
-          id: users.id,
-          email: users.email,
-          name: users.name,
-          role: users.role,
-          avatarUrl: users.avatarUrl,
-          isActive: users.isActive,
-          lastActiveAt: users.lastActiveAt,
-          createdAt: users.createdAt,
-        })
-        .from(users)
-        .where(where)
-        .orderBy(sortOrder === "asc" ? asc(users.name) : desc(users.createdAt))
-        .limit(pageSize)
-        .offset(offset),
-      db.select({ total: count() }).from(users).where(where),
-    ]);
+    const data = rows.slice(offset, offset + pageSize).map((row) => ({
+      id: row.id,
+      email: row.email,
+      name: row.name,
+      role: row.role,
+      avatarUrl: row.avatarUrl,
+      isActive: row.isActive,
+      lastActiveAt: row.lastActiveAt,
+      createdAt: row.createdAt,
+    }));
+    const total = rows.length;
 
     return {
       data,
@@ -155,20 +148,7 @@ export const adminRouter = router({
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ input }) => {
       const db = getDb();
-      const [user] = await db
-        .select({
-          id: users.id,
-          email: users.email,
-          name: users.name,
-          role: users.role,
-          avatarUrl: users.avatarUrl,
-          isActive: users.isActive,
-          lastActiveAt: users.lastActiveAt,
-          createdAt: users.createdAt,
-        })
-        .from(users)
-        .where(eq(users.id, input.id))
-        .limit(1);
+      const user = await getUserById(input.id);
 
       if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
 
@@ -178,7 +158,14 @@ export const adminRouter = router({
         .where(eq(userDomainAccess.userId, input.id));
 
       return {
-        ...user,
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        avatarUrl: user.avatarUrl,
+        isActive: user.isActive,
+        lastActiveAt: user.lastActiveAt,
+        createdAt: user.createdAt,
         domainIds: domainAccessRows.map((r) => r.domainId),
       };
     }),
@@ -454,39 +441,21 @@ export const adminRouter = router({
     requireSuperAdminForSuperAdminRole(input.role, ctx.user.role);
 
     const db = getDb();
-    const [existingUser] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
+    const existingUser = await getUserByEmail(email);
 
     if (existingUser) {
       throw new TRPCError({ code: "CONFLICT", message: "A user with this email already exists" });
     }
 
-    const passwordHash = await hashPassword(input.password);
-
-    await db
-      .insert(users)
-      .values({
-        email,
-        name: input.name,
-        role: input.role as any,
-        passwordHash,
-        invitedBy: ctx.user.id,
-        loginMethod: "password",
-      });
-
-    const [newUser] = await db
-      .select({
-        id: users.id,
-        email: users.email,
-        name: users.name,
-        role: users.role,
-      })
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
+    const newUser = await createUser({
+      email,
+      name: input.name,
+      password: input.password,
+      role: input.role,
+      invitedBy: ctx.user.id,
+      loginMethod: "password",
+      isActive: true,
+    });
 
     if (input.domainIds.length > 0) {
       await db.insert(userDomainAccess).values(
@@ -519,7 +488,7 @@ export const adminRouter = router({
     const db = getDb();
     const { id, domainIds, ...data } = input;
 
-    const [existing] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    const existing = await getUserById(id);
     if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
 
     requireSuperAdminForReservedIdentity(existing.email, ctx.user.role);
@@ -533,10 +502,7 @@ export const adminRouter = router({
     }
 
     if (Object.keys(data).length > 0) {
-      await db
-        .update(users)
-        .set({ ...data, updatedAt: new Date() } as any)
-        .where(eq(users.id, id));
+      await updateManagedUserProfile(id, data);
     }
 
     if (domainIds !== undefined) {
@@ -568,13 +534,11 @@ export const adminRouter = router({
   deactivateUser: adminProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
-      const db = getDb();
-
       if (input.id === ctx.user.id) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot deactivate your own account" });
       }
 
-      const [existing] = await db.select().from(users).where(eq(users.id, input.id)).limit(1);
+      const existing = await getUserById(input.id);
       if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
 
       requireSuperAdminForReservedIdentity(existing.email, ctx.user.role);
@@ -585,10 +549,7 @@ export const adminRouter = router({
         });
       }
 
-      await db
-        .update(users)
-        .set({ isActive: false, updatedAt: new Date() })
-        .where(eq(users.id, input.id));
+      await updateManagedUserProfile(input.id, { isActive: false });
 
       logAudit({
         userId: ctx.user.id,

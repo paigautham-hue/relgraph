@@ -1025,7 +1025,7 @@ export async function importBankLeadershipRecord(input: ImportBankLeadershipReco
       name: record.bankName,
       domainId: input.domainId,
       website: record.sourceType === "official_bank_website" ? record.sourceUrl : null,
-      type: (record.bankType ?? "bank") as InsertOrganization["type"],
+      type: "bank",
       city: null,
     });
   }
@@ -1134,7 +1134,7 @@ export async function seedIndianBankOrganizations(domainId: string, userId: stri
       id: randomUUID(),
       name: bank.name,
       domainId,
-      type: bank.type,
+      type: "bank",
       website: bank.website,
       city: null,
     };
