@@ -64,3 +64,4 @@
 - [x] Fix the missing relationships table and run the pending database migration so the dashboard queries stop failing on the iOS app
 - [x] Fix the dashboard strengthDistribution runtime error so the dashboard can render safely when the API returns a non-array payload
 - [x] Fix the approved-email allowlist query failure caused by the missing login_method column in the live users table
+- [x] Fix the domain-management add-domain failure caused by the current database insert/schema mismatch in the admin flow

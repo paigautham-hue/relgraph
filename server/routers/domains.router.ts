@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { z } from "zod";
 import { router, protectedProcedure, adminProcedure } from "../_core/trpc";
 import { createDomainSchema, updateDomainSchema } from "@shared/validation";
@@ -41,8 +42,13 @@ export const domainsRouter = router({
 
   create: adminProcedure.input(createDomainSchema).mutation(async ({ input, ctx }) => {
     const db = getDb();
-    const insertResult = await db.insert(domains).values(input);
-    const domainId = String(insertResult[0].insertId);
+    const domainId = randomUUID();
+
+    await db.insert(domains).values({
+      id: domainId,
+      ...input,
+    });
+
     const [domain] = await db.select().from(domains).where(eq(domains.id, domainId)).limit(1);
 
     if (!domain) {
