@@ -217,6 +217,18 @@ export default function ApifyManagement() {
     );
   }, [leadershipRecords]);
 
+  const runStats = useMemo(() => {
+    return runs.reduce(
+      (acc: { running: number; succeeded: number; failed: number }, run: any) => {
+        if (run.status === "running") acc.running += 1;
+        if (run.status === "succeeded") acc.succeeded += 1;
+        if (run.status === "failed") acc.failed += 1;
+        return acc;
+      },
+      { running: 0, succeeded: 0, failed: 0 },
+    );
+  }, [runs]);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -377,18 +389,22 @@ export default function ApifyManagement() {
             <div className="rounded-2xl bg-muted/40 p-4">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Configured sources</p>
               <p className="mt-2 text-2xl font-semibold text-foreground">{sources.length}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{sources.filter((source: any) => source.isActive).length} active</p>
             </div>
             <div className="rounded-2xl bg-muted/40 p-4">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Recorded runs</p>
               <p className="mt-2 text-2xl font-semibold text-foreground">{runs.length}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{runStats.succeeded} succeeded · {runStats.failed} failed</p>
             </div>
             <div className="rounded-2xl bg-muted/40 p-4">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Indian bank targets</p>
               <p className="mt-2 text-2xl font-semibold text-foreground">{bankTargets.length}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{bankTargets.filter((bank: any) => bank.organizationExists).length} present in graph</p>
             </div>
             <div className="rounded-2xl bg-muted/40 p-4">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Pending leadership review</p>
               <p className="mt-2 text-2xl font-semibold text-foreground">{leadershipReviewStats.pending}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{leadershipReviewStats.confirmed} confirmed · {leadershipReviewStats.imported} imported</p>
             </div>
           </div>
         </div>
@@ -490,7 +506,7 @@ export default function ApifyManagement() {
                     <TableHead>Name</TableHead>
                     <TableHead>Capability</TableHead>
                     <TableHead>Target</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Latest status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -508,7 +524,21 @@ export default function ApifyManagement() {
                       </TableCell>
                       <TableCell>{formatLabel(source.targetType)}</TableCell>
                       <TableCell>
-                        {source.isActive ? <Badge>Active</Badge> : <Badge variant="secondary">Paused</Badge>}
+                        <div className="space-y-1 text-right sm:text-left">
+                          <div>
+                            {source.lastRunStatus ? (
+                              <Badge variant={source.lastRunStatus === "succeeded" ? "default" : source.lastRunStatus === "failed" ? "destructive" : "secondary"}>
+                                {formatLabel(source.lastRunStatus)}
+                              </Badge>
+                            ) : source.isActive ? <Badge>Active</Badge> : <Badge variant="secondary">Paused</Badge>}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {source.lastRunAt ? `Last run ${new Date(source.lastRunAt).toLocaleString()}` : "No runs recorded yet"}
+                          </p>
+                          {source.lastRunSummary ? (
+                            <p className="max-w-xs text-xs text-muted-foreground">{source.lastRunSummary}</p>
+                          ) : null}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
@@ -580,7 +610,15 @@ export default function ApifyManagement() {
                   </div>
                   <div className="mt-3 grid gap-2 text-sm text-muted-foreground">
                     <p>Detected changes: <span className="font-medium text-foreground">{Array.isArray(run.detectedChanges) ? run.detectedChanges.length : 0}</span></p>
+                    <p>Items normalized: <span className="font-medium text-foreground">{typeof run.itemCount === "number" ? run.itemCount : 0}</span></p>
                     <p>Started: <span className="font-medium text-foreground">{run.startedAt ? new Date(run.startedAt).toLocaleString() : "-"}</span></p>
+                    <p>Finished: <span className="font-medium text-foreground">{run.finishedAt ? new Date(run.finishedAt).toLocaleString() : "Still running"}</span></p>
+                    {run.summary ? (
+                      <p>Summary: <span className="font-medium text-foreground">{run.summary}</span></p>
+                    ) : null}
+                    {run.errorMessage ? (
+                      <p>Error: <span className="font-medium text-destructive">{run.errorMessage}</span></p>
+                    ) : null}
                   </div>
                 </div>
               ))}
@@ -627,10 +665,12 @@ export default function ApifyManagement() {
                     <TableCell>
                       <div>
                         <p className="font-medium text-foreground">{bank.name}</p>
-                        <p className="text-xs text-muted-foreground">{bank.suggestedDomainId ? "Domain mapped" : "Select a domain before seeding"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {bank.organizationId ? "Organization linked" : bank.suggestedDomainId ? "Domain mapped" : "Select a domain before seeding"}
+                        </p>
                       </div>
                     </TableCell>
-                    <TableCell>{formatLabel(bank.type || "other")}</TableCell>
+                    <TableCell>{bank.sectorLabel || formatLabel(bank.type || "other")}</TableCell>
                     <TableCell>
                       {bank.website ? (
                         <a href={bank.website} target="_blank" rel="noreferrer" className="text-[var(--relgraph-primary)] hover:underline">

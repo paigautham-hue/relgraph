@@ -8,6 +8,7 @@ import {
   applyApifyEnrichmentSchema,
   bankLeadershipRecordFilterSchema,
   createApifySourceConfigSchema,
+  createBankLeadershipRecordSchema,
   importBankLeadershipRecordSchema,
   runApifySourceSchema,
   syncApifyMonitoringSchema,
@@ -18,6 +19,7 @@ import {
   applyApifyDiscovery,
   applyApifyEnrichment,
   createApifySourceConfig,
+  createBankLeadershipRecord,
   createIndianBankSeedPreview,
   getApifyRunById,
   getApifySourceConfigById,
@@ -111,6 +113,12 @@ export const apifyRouter = router({
     .input(updateBankLeadershipRecordSchema)
     .mutation(async ({ input }) => {
       return updateBankLeadershipRecord(input);
+    }),
+
+  createBankLeadershipRecord: adminProcedure
+    .input(createBankLeadershipRecordSchema)
+    .mutation(async ({ ctx, input }) => {
+      return createBankLeadershipRecord(input, ctx.user.id);
     }),
 
   importBankLeadershipRecord: adminProcedure

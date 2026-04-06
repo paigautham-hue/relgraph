@@ -76,3 +76,8 @@
 - [x] Reproduce and fix the Indian Bank Dataset data-view and seed-organizations failures in the authenticated admin flow
 - [x] Reproduce and fix the Apify management data-view or run-flow failures in the authenticated admin flow
 - [x] Add regression coverage for the repaired pagination-sensitive RelGraph data views
+- [x] Fix the remaining audit-log persistence gap so admin and system actions can write audit entries without database errors
+- [ ] Complete the Apify source and task configuration workflows with reliable run history and operational feedback
+- [ ] Populate the Indian bank leadership validation queue with source-backed ingestion so reviewed records can move beyond seeded organizations
+- [ ] Re-check related admin data flows for any remaining regressions uncovered while closing the above gaps
+- [x] Normalize the Indian Bank Dataset segment labels so the registry consistently shows Public sector and Private sector instead of legacy bank-type labels

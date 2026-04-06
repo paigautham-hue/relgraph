@@ -449,6 +449,31 @@ export const bankLeadershipRecordFilterSchema = paginationSchema.extend({
   search: z.string().optional(),
 });
 
+export const createBankLeadershipRecordSchema = z.object({
+  organizationId: z.string().uuid().optional(),
+  sourceConfigId: z.string().uuid().optional(),
+  bankName: z.string().min(1).max(255).optional(),
+  personName: z.string().min(1).max(255),
+  title: z.string().min(1).max(255),
+  sourceUrl: z.string().url(),
+  sourceType: bankLeadershipSourceTypeSchema.default("official_bank_website"),
+  sourcePublishedDate: z.string().nullable().optional(),
+  sourceExcerpt: z.string().max(5000).optional(),
+  sourcePayload: apifyJsonRecordSchema.default({}),
+  confidenceLevel: z.enum(CONFIDENCE_LEVELS).optional(),
+  confidenceScore: z.number().min(0).max(1).nullable().optional(),
+  validationStatus: bankLeadershipValidationStatusSchema.optional(),
+  validationNotes: z.string().max(5000).nullable().optional(),
+  validationEvidence: z.array(z.object({
+    label: z.string().min(1).max(255),
+    url: z.string().url().optional(),
+    note: z.string().max(1000).optional(),
+  })).optional(),
+}).refine((value) => Boolean(value.organizationId || value.bankName), {
+  message: "Provide an organization or bank name",
+  path: ["organizationId"],
+});
+
 export const updateBankLeadershipRecordSchema = z.object({
   id: z.string().uuid(),
   validationStatus: bankLeadershipValidationStatusSchema.optional(),

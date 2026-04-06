@@ -34,6 +34,7 @@ import {
   runApifySourceSchema,
   applyApifyDiscoverySchema,
   applyApifyEnrichmentSchema,
+  createBankLeadershipRecordSchema,
   importBankLeadershipRecordSchema,
   syncApifyMonitoringSchema,
   updateBankLeadershipRecordSchema,
@@ -48,6 +49,7 @@ export type ApplyApifyDiscoveryInput = z.infer<typeof applyApifyDiscoverySchema>
 export type ApplyApifyEnrichmentInput = z.infer<typeof applyApifyEnrichmentSchema>;
 export type SyncApifyMonitoringInput = z.infer<typeof syncApifyMonitoringSchema>;
 export type BankLeadershipRecordFilterInput = z.infer<typeof bankLeadershipRecordFilterSchema>;
+export type CreateBankLeadershipRecordInput = z.infer<typeof createBankLeadershipRecordSchema>;
 export type UpdateBankLeadershipRecordInput = z.infer<typeof updateBankLeadershipRecordSchema>;
 export type ImportBankLeadershipRecordInput = z.infer<typeof importBankLeadershipRecordSchema>;
 
@@ -131,6 +133,38 @@ const INDIAN_BANK_TARGETS: IndianBankTarget[] = [
   { name: "Dhanlaxmi Bank", type: "private_bank", website: "https://www.dhanbank.com", regulatorGroup: "private_sector_bank" },
   { name: "Nainital Bank", type: "private_bank", website: "https://www.nainitalbank.co.in", regulatorGroup: "private_sector_bank" },
 ];
+
+function toLegacyUserForeignKey(userId: string | null | undefined): number | null {
+  if (!userId) return null;
+  const normalized = String(userId).trim();
+  if (!/^\d+$/.test(normalized)) return null;
+  const parsed = Number.parseInt(normalized, 10);
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}
+
+function asLegacyUserRef(userId: string | null | undefined) {
+  return toLegacyUserForeignKey(userId) as any;
+}
+
+function toLegacyBankType(value: string | null | undefined) {
+  switch (value) {
+    case "psu_bank":
+    case "private_bank":
+    case "nbfc":
+    case "dfi":
+    case "bank":
+      return "bank";
+    case "corporate":
+    case "company":
+      return "company";
+    case "regulator":
+      return "regulator";
+    case "government":
+      return "government";
+    default:
+      return "other";
+  }
+}
 
 function ensureApifyToken() {
   if (!ENV.apifyApiToken) {
@@ -389,7 +423,7 @@ async function persistBankLeadershipRecords(params: {
       title: item.currentTitle ?? item.title,
       normalizedTitle: item.currentTitle ?? null,
       bankName: matchedOrganization?.name ?? item.organizationName ?? targetOrganization?.name ?? params.source?.name ?? "Unknown bank",
-      bankType: (matchedOrganization?.type ?? "bank") as InsertBankLeadershipRecord["bankType"],
+      bankType: toLegacyBankType(matchedOrganization?.type ?? "bank") as InsertBankLeadershipRecord["bankType"],
       sourceUrl: sourceUrl ?? "https://apify.invalid/local-record",
       sourceDomain,
       sourceType: inferBankLeadershipSourceType(sourceUrl, item.raw),
@@ -405,7 +439,7 @@ async function persistBankLeadershipRecords(params: {
       isImported: false,
       importedPersonId: null,
       importedTenureId: null,
-      createdBy: params.userId,
+      createdBy: asLegacyUserRef(params.userId),
     });
   }
 
@@ -527,7 +561,7 @@ export async function createApifySourceConfig(input: CreateApifySourceConfigInpu
     runFrequencyCron: input.runFrequencyCron ?? null,
     targetOrganizationId: input.targetOrganizationId ?? null,
     targetPersonId: input.targetPersonId ?? null,
-    createdBy: userId,
+    createdBy: asLegacyUserRef(userId),
     isActive: input.isActive,
   };
 
@@ -629,7 +663,7 @@ export async function runApifySource(input: RunApifySourceInput, userId: string)
     },
     targetOrganizationId: input.targetOrganizationId ?? source?.targetOrganizationId ?? null,
     targetPersonId: input.targetPersonId ?? source?.targetPersonId ?? null,
-    initiatedBy: userId,
+    initiatedBy: asLegacyUserRef(userId),
     startedAt: now,
   };
 
@@ -726,6 +760,10 @@ async function findOrganizationByName(name: string) {
   return rows[0] ?? null;
 }
 
+function normalizeBankSegmentLabel(target: IndianBankTarget) {
+  return target.regulatorGroup === "public_sector_bank" ? "Public sector" : "Private sector";
+}
+
 async function ensureOrganization(input: { name: string; domainId: string; website?: string | null; type?: string | null; city?: string | null; }) {
   const existing = await findOrganizationByName(input.name);
   if (existing) return existing;
@@ -787,7 +825,7 @@ export async function applyApifyDiscovery(input: ApplyApifyDiscoveryInput, userI
         category: (item.category ?? input.defaultCategory ?? "banker") as InsertPerson["category"],
         photoUrl: item.imageUrl ?? null,
         isTracked: true,
-        createdBy: userId,
+        createdBy: asLegacyUserRef(userId),
       };
       await db.insert(persons).values(row);
     }
@@ -810,7 +848,7 @@ export async function applyApifyDiscovery(input: ApplyApifyDiscoveryInput, userI
         personId,
         fieldName,
         fieldValue,
-        contributedBy: userId,
+        contributedBy: asLegacyUserRef(userId),
         inputMethod: "auto_scraper",
         sourceUrl: item.sourceUrl,
         aiConfidence: item.confidence,
@@ -828,7 +866,7 @@ export async function applyApifyDiscovery(input: ApplyApifyDiscoveryInput, userI
         isCurrent: true,
         source: "auto_scraped",
         sourceUrl: item.sourceUrl,
-        createdBy: userId,
+        createdBy: asLegacyUserRef(userId),
       };
       await db.insert(tenures).values(tenureRow);
     }
@@ -874,7 +912,7 @@ export async function applyApifyEnrichment(input: ApplyApifyEnrichmentInput, use
         personId: input.personId,
         fieldName,
         fieldValue,
-        contributedBy: userId,
+        contributedBy: asLegacyUserRef(userId),
         inputMethod: "auto_scraper",
         sourceUrl: item.sourceUrl,
         aiConfidence: item.confidence,
@@ -982,6 +1020,64 @@ export async function getBankLeadershipRecordById(id: string) {
   return rows[0] ?? null;
 }
 
+export async function createBankLeadershipRecord(input: CreateBankLeadershipRecordInput, userId: string) {
+  const db = getDb();
+  const organization = input.organizationId
+    ? (await db.select().from(organizations).where(eq(organizations.id, input.organizationId)).limit(1))[0] ?? null
+    : input.bankName
+      ? await findOrganizationByName(input.bankName)
+      : null;
+
+  const bankName = organization?.name ?? input.bankName ?? "Unknown bank";
+  const roleType = normalizeBankLeadershipRole(input.title);
+  const confidenceScore = input.confidenceScore ?? 0.92;
+  const validationEvidence = input.validationEvidence ?? [
+    {
+      label: "Submitted source",
+      url: input.sourceUrl,
+      note: input.sourceExcerpt ?? `Manual leadership evidence for ${bankName}`,
+    },
+  ];
+
+  const record: InsertBankLeadershipRecord = {
+    id: randomUUID(),
+    organizationId: organization?.id ?? input.organizationId ?? null,
+    apifyRunId: null,
+    sourceConfigId: input.sourceConfigId ?? null,
+    roleType,
+    personName: input.personName,
+    title: input.title,
+    normalizedTitle: input.title,
+    bankName,
+    bankType: toLegacyBankType(organization?.type ?? "bank") as InsertBankLeadershipRecord["bankType"],
+    sourceUrl: input.sourceUrl,
+    sourceDomain: (() => {
+      try {
+        return new URL(input.sourceUrl).hostname.toLowerCase();
+      } catch {
+        return null;
+      }
+    })(),
+    sourceType: input.sourceType,
+    sourcePublishedDate: input.sourcePublishedDate ? new Date(input.sourcePublishedDate) : null,
+    sourceObservedAt: new Date(),
+    sourceExcerpt: input.sourceExcerpt ?? null,
+    sourcePayload: input.sourcePayload,
+    validationStatus: input.validationStatus ?? "official_source_confirmed",
+    confidenceLevel: input.confidenceLevel ?? inferConfidenceLevel(confidenceScore),
+    confidenceScore,
+    validationNotes: input.validationNotes ?? null,
+    validationEvidence,
+    isImported: false,
+    importedPersonId: null,
+    importedTenureId: null,
+    createdBy: asLegacyUserRef(userId),
+  };
+
+  await db.insert(bankLeadershipRecords).values(record);
+  return (await getBankLeadershipRecordById(record.id))!;
+}
+
 export async function updateBankLeadershipRecord(input: UpdateBankLeadershipRecordInput) {
   const db = getDb();
   const patch: Partial<InsertBankLeadershipRecord> = {
@@ -1043,7 +1139,7 @@ export async function importBankLeadershipRecord(input: ImportBankLeadershipReco
       category: "banker",
       photoUrl: null,
       isTracked: true,
-      createdBy: userId,
+      createdBy: asLegacyUserRef(userId),
     };
     await db.insert(persons).values(personRow);
     person = (await db.select().from(persons).where(eq(persons.id, personRow.id)).limit(1))[0] ?? null;
@@ -1068,7 +1164,7 @@ export async function importBankLeadershipRecord(input: ImportBankLeadershipReco
         isCurrent: input.markAsCurrent,
         source: "auto_scraped",
         sourceUrl: record.sourceUrl,
-        createdBy: userId,
+        createdBy: asLegacyUserRef(userId),
       };
       await db.insert(tenures).values(tenureRow);
       importedTenureId = tenureRow.id;
@@ -1097,11 +1193,16 @@ export async function getIndianBankTargets() {
   const existingDomains = await db.select().from(domains).orderBy(desc(domains.createdAt));
   const existingOrganizations = await db.select().from(organizations);
 
-  return INDIAN_BANK_TARGETS.map((target) => ({
-    ...target,
-    organizationExists: existingOrganizations.some((organization) => organization.name === target.name),
-    suggestedDomainId: existingDomains[0]?.id ?? null,
-  }));
+  return INDIAN_BANK_TARGETS.map((target) => {
+    const matchedOrganization = existingOrganizations.find((organization) => organization.name === target.name);
+    return {
+      ...target,
+      sectorLabel: normalizeBankSegmentLabel(target),
+      organizationExists: Boolean(matchedOrganization),
+      organizationId: matchedOrganization?.id ?? null,
+      suggestedDomainId: existingDomains[0]?.id ?? null,
+    };
+  });
 }
 
 export async function createIndianBankSeedPreview(domainId: string) {
@@ -1176,7 +1277,7 @@ export async function seedIndianBankOrganizations(domainId: string, userId: stri
       runFrequencyCron: "0 0 * * 1",
       targetOrganizationId: organization.id,
       targetPersonId: null,
-      createdBy: userId,
+      createdBy: asLegacyUserRef(userId),
       isActive: true,
     };
     await db.insert(apifySourceConfigs).values(sourceConfig);

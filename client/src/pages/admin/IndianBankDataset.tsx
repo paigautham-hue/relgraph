@@ -38,6 +38,15 @@ function formatDate(value: string | Date | null | undefined) {
   return parsed.toLocaleDateString();
 }
 
+function getBankSegmentLabel(bank: any) {
+  if (bank?.sectorLabel) return bank.sectorLabel;
+  if (bank?.regulatorGroup === "public_sector_bank") return "Public sector";
+  if (bank?.regulatorGroup === "private_sector_bank") return "Private sector";
+  if (bank?.type === "psu_bank") return "Public sector";
+  if (bank?.type === "private_bank") return "Private sector";
+  return formatLabel(bank?.type || "other");
+}
+
 export default function IndianBankDataset() {
   const { user } = useAuth();
   const utils = trpc.useUtils();
@@ -110,6 +119,33 @@ export default function IndianBankDataset() {
     },
   });
 
+  const [manualRecordDraft, setManualRecordDraft] = useState({
+    bankName: "",
+    personName: "",
+    title: "",
+    sourceUrl: "",
+    sourceType: "official_bank_website",
+    sourceExcerpt: "",
+  });
+
+  const createManualRecordMutation = trpc.apify.createBankLeadershipRecord.useMutation({
+    onSuccess: async () => {
+      toast.success("Leadership record captured for review.");
+      setManualRecordDraft({
+        bankName: "",
+        personName: "",
+        title: "",
+        sourceUrl: "",
+        sourceType: "official_bank_website",
+        sourceExcerpt: "",
+      });
+      await utils.apify.listBankLeadershipRecords.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message || "The leadership record could not be captured.");
+    },
+  });
+
   const importRecordMutation = trpc.apify.importBankLeadershipRecord.useMutation({
     onSuccess: async (result) => {
       toast.success(`Imported ${result.person?.name ?? "leadership record"} into RelGraph.`);
@@ -143,6 +179,16 @@ export default function IndianBankDataset() {
     );
   }, [leadershipRecords]);
 
+  const publicSectorCount = useMemo(
+    () => bankTargets.filter((bank: any) => bank.regulatorGroup === "public_sector_bank" || bank.sectorLabel === "Public sector").length,
+    [bankTargets],
+  );
+
+  const privateSectorCount = useMemo(
+    () => bankTargets.filter((bank: any) => bank.regulatorGroup === "private_sector_bank" || bank.sectorLabel === "Private sector").length,
+    [bankTargets],
+  );
+
   function getDraftNote(record: any) {
     return noteDrafts[record.id] ?? record.validationNotes ?? "";
   }
@@ -170,6 +216,27 @@ export default function IndianBankDataset() {
       domainId: selectedDomainId || undefined,
       createOrganizationIfMissing: Boolean(selectedDomainId),
       markAsCurrent: true,
+    });
+  }
+
+  function handleCreateManualRecord() {
+    const matchedBank = bankTargets.find((bank: any) => bank.name === manualRecordDraft.bankName);
+    createManualRecordMutation.mutate({
+      organizationId: matchedBank?.organizationId ?? undefined,
+      bankName: matchedBank?.name ?? manualRecordDraft.bankName,
+      personName: manualRecordDraft.personName,
+      title: manualRecordDraft.title,
+      sourceUrl: manualRecordDraft.sourceUrl,
+      sourceType: manualRecordDraft.sourceType as any,
+      sourceExcerpt: manualRecordDraft.sourceExcerpt || undefined,
+      validationStatus: "official_source_confirmed",
+      validationEvidence: [
+        {
+          label: "Submitted source",
+          url: manualRecordDraft.sourceUrl,
+          note: manualRecordDraft.sourceExcerpt || `Manual leadership submission for ${matchedBank?.name ?? manualRecordDraft.bankName}`,
+        },
+      ],
     });
   }
 
@@ -219,13 +286,13 @@ export default function IndianBankDataset() {
             <div className="rounded-2xl bg-muted/40 p-4">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Public sector</p>
               <p className="mt-2 text-2xl font-semibold text-foreground">
-                {bankTargets.filter((bank: any) => bank.type === "psu_bank").length}
+                {publicSectorCount}
               </p>
             </div>
             <div className="rounded-2xl bg-muted/40 p-4">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Private sector</p>
               <p className="mt-2 text-2xl font-semibold text-foreground">
-                {bankTargets.filter((bank: any) => bank.type === "private_bank").length}
+                {privateSectorCount}
               </p>
             </div>
           </div>
@@ -326,7 +393,7 @@ export default function IndianBankDataset() {
                         </p>
                       </div>
                     </TableCell>
-                    <TableCell>{formatLabel(bank.type || "other")}</TableCell>
+                    <TableCell>{getBankSegmentLabel(bank)}</TableCell>
                     <TableCell>
                       {bank.website ? (
                         <a
@@ -357,6 +424,98 @@ export default function IndianBankDataset() {
       </div>
 
       <div className="rounded-3xl border bg-card p-5">
+        <div className="mb-5 grid gap-4 rounded-2xl border bg-background/60 p-4 lg:grid-cols-[1.2fr_0.8fr]">
+          <div>
+            <p className="text-sm font-semibold text-foreground">Capture an official leadership record manually</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Use this when you have an authoritative bank page, filing, or release and want to add a reviewed leadership candidate without waiting for the next automated run.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="manual-bank-name">Bank</Label>
+              <select
+                id="manual-bank-name"
+                className="flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                value={manualRecordDraft.bankName}
+                onChange={(event) => setManualRecordDraft((current) => ({ ...current, bankName: event.target.value }))}
+              >
+                <option value="">Select a bank target</option>
+                {bankTargets.map((bank: any) => (
+                  <option key={bank.name} value={bank.name}>{bank.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="manual-person-name">Leadership name</Label>
+              <input
+                id="manual-person-name"
+                className="flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                value={manualRecordDraft.personName}
+                onChange={(event) => setManualRecordDraft((current) => ({ ...current, personName: event.target.value }))}
+                placeholder="Executive name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="manual-title">Observed title</Label>
+              <input
+                id="manual-title"
+                className="flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                value={manualRecordDraft.title}
+                onChange={(event) => setManualRecordDraft((current) => ({ ...current, title: event.target.value }))}
+                placeholder="Managing Director & CEO"
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="manual-source-url">Source URL</Label>
+              <input
+                id="manual-source-url"
+                className="flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                value={manualRecordDraft.sourceUrl}
+                onChange={(event) => setManualRecordDraft((current) => ({ ...current, sourceUrl: event.target.value }))}
+                placeholder="https://bank.example.com/leadership"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="manual-source-type">Source type</Label>
+              <select
+                id="manual-source-type"
+                className="flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                value={manualRecordDraft.sourceType}
+                onChange={(event) => setManualRecordDraft((current) => ({ ...current, sourceType: event.target.value }))}
+              >
+                <option value="official_bank_website">Official bank website</option>
+                <option value="stock_exchange_filing">Stock exchange filing</option>
+                <option value="regulator_publication">Regulator publication</option>
+                <option value="government_release">Government release</option>
+                <option value="annual_report">Annual report</option>
+                <option value="press_release">Press release</option>
+                <option value="secondary_reference">Secondary reference</option>
+              </select>
+            </div>
+            <div className="space-y-2 sm:col-span-1">
+              <Label htmlFor="manual-source-excerpt">Evidence note</Label>
+              <textarea
+                id="manual-source-excerpt"
+                className="min-h-24 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                value={manualRecordDraft.sourceExcerpt}
+                onChange={(event) => setManualRecordDraft((current) => ({ ...current, sourceExcerpt: event.target.value }))}
+                placeholder="Capture the title wording, date, and why this source is authoritative."
+              />
+            </div>
+            <div className="flex items-end sm:col-span-2">
+              <Button
+                type="button"
+                className="w-full bg-[var(--relgraph-primary)] hover:bg-[var(--relgraph-primary-dark)]"
+                disabled={createManualRecordMutation.isPending || !manualRecordDraft.bankName || !manualRecordDraft.personName || !manualRecordDraft.title || !manualRecordDraft.sourceUrl}
+                onClick={handleCreateManualRecord}
+              >
+                {createManualRecordMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
+                Add reviewed leadership candidate
+              </Button>
+            </div>
+          </div>
+        </div>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-sm font-semibold text-foreground">Leadership validation queue</p>
@@ -500,6 +659,11 @@ export default function IndianBankDataset() {
                               {record.validationEvidence.map((entry: any, index: number) => (
                                 <li key={`${record.id}-evidence-${index}`}>
                                   <span className="font-medium text-foreground">{entry.label}</span>
+                                  {entry.url ? (
+                                    <a href={entry.url} target="_blank" rel="noreferrer" className="ml-2 text-[var(--relgraph-primary)] hover:underline">
+                                      source
+                                    </a>
+                                  ) : null}
                                   {entry.note ? ` — ${entry.note}` : ""}
                                 </li>
                               ))}
