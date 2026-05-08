@@ -6,6 +6,61 @@ const getClient = () => {
   return new AssemblyAI({ apiKey });
 };
 
+/**
+ * Upload an audio buffer to AssemblyAI's CDN and synchronously transcribe.
+ * Used by the universal voice input — short clips (<= 60 s) get transcribed
+ * end-to-end in a single round-trip from the client's perspective.
+ *
+ * For long-form recordings (meetings, interviews), the queued path
+ * (`transcribeAudio` with a pre-uploaded URL) is preferred.
+ *
+ * Caller passes the raw bytes as a Buffer; we forward to AssemblyAI's upload
+ * endpoint and immediately request transcription with sane defaults.
+ */
+export async function uploadAndTranscribe(
+  audioBuffer: Buffer,
+  options?: { languageDetection?: boolean },
+): Promise<{ id: string; text: string; status: string; durationSec: number | null }> {
+  const apiKey = process.env.ASSEMBLYAI_API_KEY;
+  if (!apiKey) throw new Error("ASSEMBLYAI_API_KEY not configured");
+
+  // Step 1: upload bytes to AssemblyAI's signed-URL endpoint. Node's
+  // fetch type definitions reject raw Buffer (SharedArrayBuffer-vs-ArrayBuffer
+  // strictness) — copy into a fresh ArrayBuffer-backed Uint8Array first, then
+  // wrap in a Blob (Node 18+ global) which is BodyInit-compatible.
+  const fresh = new Uint8Array(audioBuffer.byteLength);
+  fresh.set(audioBuffer);
+  const body = new Blob([fresh], { type: "application/octet-stream" });
+  const uploadResp = await fetch("https://api.assemblyai.com/v2/upload", {
+    method: "POST",
+    headers: {
+      authorization: apiKey,
+      "content-type": "application/octet-stream",
+    },
+    body,
+  });
+  if (!uploadResp.ok) {
+    const errText = await uploadResp.text().catch(() => "");
+    throw new Error(`AssemblyAI upload failed (${uploadResp.status}): ${errText}`);
+  }
+  const uploadJson = (await uploadResp.json()) as { upload_url?: string };
+  if (!uploadJson.upload_url) throw new Error("AssemblyAI did not return an upload_url");
+
+  // Step 2: start transcription. The SDK's `transcribe()` polls until done.
+  const client = getClient();
+  const transcript = await client.transcripts.transcribe({
+    audio_url: uploadJson.upload_url,
+    speech_model: "best" as any,
+    language_detection: options?.languageDetection ?? true,
+  });
+  return {
+    id: transcript.id,
+    text: transcript.text ?? "",
+    status: transcript.status,
+    durationSec: typeof transcript.audio_duration === "number" ? transcript.audio_duration : null,
+  };
+}
+
 export async function transcribeAudio(audioUrl: string) {
   const client = getClient();
   const transcript = await client.transcripts.transcribe({

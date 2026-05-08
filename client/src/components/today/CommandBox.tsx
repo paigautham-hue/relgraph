@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { VoiceInputButton } from "@/components/voice/VoiceInputButton";
 import {
   Activity,
   AlertCircle,
@@ -35,7 +35,6 @@ import {
   CheckCircle2,
   Eye,
   HelpCircle,
-  Mic,
   Newspaper,
   Send,
   Sparkles,
@@ -167,17 +166,15 @@ export function CommandBox() {
                 className="min-h-[44px] max-h-[200px] resize-none border-0 bg-transparent px-1 py-2 text-base shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 md:text-base"
                 aria-label="Command box — type a question or describe what happened"
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                disabled
-                className="mt-1 h-11 w-11 flex-shrink-0 rounded-full"
-                aria-label="Voice input (coming next phase)"
-                title="Voice input ships next phase"
-              >
-                <Mic className="h-4 w-4 text-muted-foreground" aria-hidden />
-              </Button>
+              <div className="mt-1">
+                <VoiceInputButton
+                  onTranscription={(text) =>
+                    setText((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text))
+                  }
+                  ariaLabel="Voice input — tap to record, tap stop to insert"
+                  disabled={isPending}
+                />
+              </div>
               <Button
                 type="button"
                 onClick={handleSubmit}
