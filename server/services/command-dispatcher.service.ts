@@ -26,8 +26,12 @@ import {
   watches,
   interactions,
   interactionParticipants,
+  opportunities,
 } from "../db/schema";
 import type { ClassifiedIntent, IntentTool } from "./intent-router.service";
+import { OPPORTUNITY_STAGE_TRANSITIONS, OPPORTUNITY_STAGES } from "../../shared/enums";
+import type { OpportunityStage } from "../../shared/enums";
+import { recordProvenance } from "../routers/provenance.router";
 
 export type CommandResult =
   | { kind: "paths"; summary: string; payload: { target: string; results: unknown[] } }
@@ -81,9 +85,11 @@ export async function dispatchIntent(
       case "searchIntel":
         return await searchIntelTool(intent.args.org ?? "", ctx);
       case "updateOpportunity":
-        return pendingResult(
-          "Opportunities ship in next phase. For now, log this as a note on the related contact.",
-          "Phase 5",
+        return await updateOpportunityTool(
+          intent.args.name ?? "",
+          intent.args.stage ?? "",
+          intent.args.note,
+          ctx,
         );
       case "addToWatchlist":
         return await addToWatchlistTool(intent.args.target ?? "", ctx);
@@ -255,6 +261,18 @@ async function logInteractionTool(text: string, ctx: DispatchContext): Promise<C
     });
   }
 
+  // Record provenance: this interaction came in via the command box
+  // (text_capture). Confidence 0.7 — entity-extraction is naive in week 3
+  // and will tighten when the LLM-based extractor lands.
+  await recordProvenance({
+    entityType: "interaction",
+    entityId: interactionId,
+    sourceType: "text_capture",
+    sourceLabel: "Command box",
+    capturedBy: ctx.userId,
+    confidence: 0.7,
+  });
+
   const peopleSummary =
     matchedPersons.length === 0
       ? "No matching contacts auto-linked"
@@ -263,6 +281,95 @@ async function logInteractionTool(text: string, ctx: DispatchContext): Promise<C
     kind: "logged",
     summary: `Logged. ${peopleSummary}. Open the interaction to add details or attach an opportunity.`,
     payload: { interactionId, matchedPersons },
+  };
+}
+
+// ─── updateOpportunity ───────────────────────────────────────────────────────
+
+async function updateOpportunityTool(
+  name: string,
+  stageInput: string,
+  note: string | undefined,
+  ctx: DispatchContext,
+): Promise<CommandResult> {
+  if (!name.trim()) {
+    return {
+      kind: "error",
+      summary: "Tell me which opportunity. Example: 'Got the LOI from SBI for the lending partnership'.",
+      payload: { reason: "missing_name" },
+    };
+  }
+  const stageNormalised = stageInput.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (!OPPORTUNITY_STAGES.includes(stageNormalised as OpportunityStage)) {
+    return {
+      kind: "error",
+      summary: `"${stageInput}" isn't a valid stage. Try: ${OPPORTUNITY_STAGES.slice(0, -1).join(", ")}, or lost.`,
+      payload: { reason: "invalid_stage" },
+    };
+  }
+  const targetStage = stageNormalised as OpportunityStage;
+
+  const db = getDb();
+  const q = `%${name.toLowerCase()}%`;
+  const matches = await db
+    .select({ id: opportunities.id, name: opportunities.name, stage: opportunities.stage, ownerId: opportunities.ownerId })
+    .from(opportunities)
+    .where(sql`LOWER(${opportunities.name}) LIKE ${q}`)
+    .limit(5);
+  if (matches.length === 0) {
+    return {
+      kind: "error",
+      summary: `No opportunity matches "${name}" yet. Create one first from the Opportunities page.`,
+      payload: { reason: "no_match" },
+    };
+  }
+  if (matches.length > 1) {
+    return {
+      kind: "error",
+      summary: `${matches.length} opportunities match "${name}" — be more specific or open the Opportunities page to update directly.`,
+      payload: { reason: "ambiguous" },
+    };
+  }
+  const opp = matches[0];
+  const fromStage = opp.stage as OpportunityStage;
+  if (fromStage === targetStage) {
+    return {
+      kind: "opportunity_updated",
+      summary: `${opp.name} is already in stage "${targetStage}". Nothing to change.`,
+      payload: { name: opp.name, stage: targetStage },
+    };
+  }
+  const allowed = OPPORTUNITY_STAGE_TRANSITIONS[fromStage] ?? [];
+  if (!allowed.includes(targetStage)) {
+    return {
+      kind: "error",
+      summary: `Can't move "${opp.name}" from "${fromStage}" directly to "${targetStage}". Allowed next: ${allowed.join(", ")}.`,
+      payload: { reason: "invalid_transition" },
+    };
+  }
+
+  const now = new Date();
+  await db
+    .update(opportunities)
+    .set({ stage: targetStage, lastStageChangeAt: now, lastActivityAt: now })
+    .where(eq(opportunities.id, opp.id));
+
+  // Record provenance for the stage transition.
+  await recordProvenance({
+    entityType: "opportunity",
+    entityId: opp.id,
+    fieldName: "stage",
+    sourceType: "text_capture",
+    sourceLabel: "Command box",
+    capturedBy: ctx.userId,
+    confidence: 0.85,
+    metadata: note ? { note, fromStage, toStage: targetStage } : { fromStage, toStage: targetStage },
+  });
+
+  return {
+    kind: "opportunity_updated",
+    summary: `Moved "${opp.name}" from ${fromStage} to ${targetStage}.${note ? ` Noted: "${note}"` : ""}`,
+    payload: { name: opp.name, stage: targetStage },
   };
 }
 

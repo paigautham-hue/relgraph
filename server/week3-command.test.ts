@@ -108,13 +108,22 @@ describe("Command dispatcher — error paths return graceful results", () => {
     expect(result.summary.toLowerCase()).toContain("don't recognise");
   });
 
-  it("updateOpportunity returns 'pending' kind (week 5 dependency)", async () => {
+  it("updateOpportunity with empty name returns error (week 5 — full impl)", async () => {
     const result = await dispatchIntent(
-      { tool: "updateOpportunity", args: { name: "X", stage: "engage" }, confidence: 0.9 },
+      { tool: "updateOpportunity", args: { name: "", stage: "engage" }, confidence: 0.9 },
       ctx,
     );
-    expect(result.kind).toBe("pending");
-    expect(result.summary.toLowerCase()).toContain("phase");
+    expect(result.kind).toBe("error");
+    expect(result.summary.toLowerCase()).toContain("opportunity");
+  });
+
+  it("updateOpportunity with invalid stage returns error", async () => {
+    const result = await dispatchIntent(
+      { tool: "updateOpportunity", args: { name: "X", stage: "abandoned" }, confidence: 0.9 },
+      ctx,
+    );
+    expect(result.kind).toBe("error");
+    expect(result.summary.toLowerCase()).toContain("valid stage");
   });
 
   it("'unknown' returns error kind with rationale surfaced", async () => {

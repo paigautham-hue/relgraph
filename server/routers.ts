@@ -21,6 +21,9 @@ import { alertsRouter } from "./routers/alerts.router";
 import { apifyRouter } from "./routers/apify.router";
 import { agentsRouter } from "./routers/agents.router";
 import { todayRouter } from "./routers/today.router";
+import { opportunitiesRouter } from "./routers/opportunities.router";
+import { ownershipRouter } from "./routers/ownership.router";
+import { provenanceRouter } from "./routers/provenance.router";
 
 export const appRouter = router({
   system: systemRouter,
@@ -45,6 +48,9 @@ export const appRouter = router({
   apify: apifyRouter,
   agents: agentsRouter,
   today: todayRouter,
+  opportunities: opportunitiesRouter,
+  ownership: ownershipRouter,
+  provenance: provenanceRouter,
 });
 
 export type AppRouter = typeof appRouter;

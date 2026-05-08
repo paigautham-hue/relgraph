@@ -25,6 +25,7 @@ import {
   Activity,
   Bell,
   Bot,
+  Briefcase,
   Building2,
   Database,
   FileText,
@@ -48,6 +49,7 @@ import { Button } from "./ui/button";
 const menuItems = [
   { icon: Sparkles, label: "Today", path: "/" },
   { icon: Network, label: "Graph", path: "/graph" },
+  { icon: Briefcase, label: "Opportunities", path: "/opportunities" },
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: Users, label: "People", path: "/persons" },
   { icon: Building2, label: "Organizations", path: "/organizations" },
