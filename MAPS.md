@@ -1,6 +1,6 @@
 # RelGraph MAPS — Single Source of Truth
 
-**Last updated:** 2026-05-08 (Week 1 schema foundation shipped)
+**Last updated:** 2026-05-08 (Week 2 partial — agent runner + skeleton seed + Agent Ops UI shipped)
 **Update rule:** Every PR that adds/changes/removes code MUST update the relevant section in this file in the same commit. PR is not done until MAPS reflects reality. See `CLAUDE.md` for enforcement.
 
 This file is the authoritative map of the codebase. Read it first when picking up work. When in doubt, MAPS wins over memory; code wins over MAPS — fix MAPS if reality has drifted.
@@ -203,6 +203,7 @@ Root router: `server/routers.ts` — composes 20 sub-routers under `appRouter`.
 | `briefings` | generate, list (contributor) | 26 lines |
 | `alerts` | list, dismiss, markAction | 44 lines |
 | `apify` | listSourceConfigs, getSourceConfig, createSourceConfig, updateSourceConfig, listRuns, getRun, runSource, applyDiscovery, applyEnrichment, syncMonitoring, listBankLeadershipRecords, getBankLeadershipRecord, updateBankLeadershipRecord, createBankLeadershipRecord, importBankLeadershipRecord, getIndianBankTargets, previewIndianBankSeed, seedIndianBankOrganizations | 146 lines |
+| `agents` | listRegistry, listSchedules, updateSchedule, listRuns, runNow, resetMonthlyUsage (admin) | week 2: 250 lines — drives the Agent Operations admin UI |
 
 ### Planned new routers (weeks 1-6)
 
@@ -256,6 +257,7 @@ Root router: `server/routers.ts` — composes 20 sub-routers under `appRouter`.
 | ApifyManagement.tsx | Source configs, runs, bank seeding |
 | IndianBankDataset.tsx | Bank leadership records + validation |
 | AuditLog.tsx | Audit table with filters |
+| AgentOperations.tsx | **(week 2)** Agent schedules + recent runs admin page. Optimistic UI on toggles; designed loading/empty states; AlertDialog for monthly-usage reset. 700 lines. |
 
 ### Components (`client/src/components/`)
 
@@ -337,16 +339,26 @@ Defined in `server/services/agent-registry.service.ts:AGENT_DEFINITIONS`. Synced
 
 | Agent name | Default cadence | Start state | Token cap (USD/mo) | Model | Status |
 |---|---|---|---|---|---|
-| `ingestion_rbi_pib` | `0 */6 * * *` (every 6h) | Off, dry-run | 50 | haiku | ✅ schema, 📋 implementation week 2 |
-| `ingestion_mca21_gazette` | `0 2 * * *` (02:00 IST) | Off, dry-run | 30 | haiku | ✅ schema, 📋 week 2 |
-| `ingestion_bse_nse` | `0 20 * * *` (20:00 IST) | Off, dry-run | 40 | haiku | ✅ schema, 📋 week 2 |
-| `change_detection` | `0 4 * * *` (04:00 IST) | Off | 20 | sonnet | ✅ schema, 📋 week 2 |
-| `dedup` | `* * * * *` (event-driven) | On | 10 | haiku | ✅ schema, 📋 week 2 |
-| `enrichment` | `0 3 * * 0` (Sun 03:00) | Off | 15 | haiku | ✅ schema, 📋 week 2 |
-| `path_recompute` | event-driven | On | 5 | none | ✅ schema, 📋 week 6 |
-| `brief` | `0 5 * * *` per user | On | 25 | sonnet | ✅ schema, 📋 week 6 |
-| `trust_auditor` | `0 4 * * 0` (Sun 04:00) | On | 5 | haiku | ✅ schema, 📋 week 6 |
-| `digest` | `0 6 * * *` per user | On | 20 | sonnet | ✅ schema, 📋 week 6 |
+| `ingestion_rbi_pib` | `0 */6 * * *` (every 6h) | Off, dry-run | 50 | haiku | ✅ runner, 📋 dispatcher (week 2.3) |
+| `ingestion_mca21_gazette` | `0 2 * * *` (02:00 IST) | Off, dry-run | 30 | haiku | ✅ runner, 📋 dispatcher (week 2.3) |
+| `ingestion_bse_nse` | `0 20 * * *` (20:00 IST) | Off, dry-run | 40 | haiku | ✅ runner, 📋 dispatcher (week 2.3) |
+| `change_detection` | `0 4 * * *` (04:00 IST) | Off | 20 | sonnet | ✅ runner, 📋 dispatcher (week 2.5) |
+| `dedup` | event-driven | On | 10 | haiku | ✅ runner, 📋 dispatcher (week 2.4) |
+| `enrichment` | `0 3 * * 0` (Sun 03:00) | Off | 15 | haiku | ✅ runner, 📋 dispatcher (week 2+) |
+| `path_recompute` | event-driven | On | 5 | none | ✅ runner, 📋 dispatcher (week 6) |
+| `brief` | `0 5 * * *` per user | On | 25 | sonnet | ✅ runner, 📋 dispatcher (week 6) |
+| `trust_auditor` | `0 4 * * 0` (Sun 04:00) | On | 5 | haiku | ✅ runner, 📋 dispatcher (week 6) |
+| `digest` | `0 6 * * *` per user | On | 20 | sonnet | ✅ runner, 📋 dispatcher (week 6) |
+
+**Agent runner (✅ shipped week 2):**
+- `server/services/agent-runner.service.ts` — singleton tick every 60 s started in `server/index.ts`. Atomic claim via UPDATE-with-WHERE on `next_run_at`; safe across multi-replica deploys. Per-run timeout: 5 min (Promise.race). Token-cap soft-pause sets status `budget_exhausted`. Manual `triggerRunNow()` for the admin UI's "Run now" button.
+- `server/services/cron-utils.ts` — in-house 5-field parser + IST-aware `computeNextRunAt(cron, from)` that returns absolute UTC. Supports `*`, ints, ranges (`a-b`), lists (`a,b,c`), step values (`*/n`). Plain-English `describeCronIST()` for admin UI hints.
+- All dispatchers are no-ops in week 2 — registered via `registerAgentDispatcher(name, fn)` from each agent's implementation file in weeks 2.3-2.5 / week 6.
+
+**Institutional skeleton (✅ shipped week 2.6):**
+- `server/db/institutional-skeleton.ts` — curated dataset of 54 organizations: 12 PSU banks (post-2020 consolidation), 20 major private banks, 5 financial regulators (RBI/SEBI/IRDAI/PFRDA/IFSCA), 5 government bodies (MoF, DFS, DEA, DIPAM, MCA), 7 DFIs (LIC, NABARD, SIDBI, NHB, EXIM, NaBFID, IREDA), 5 market infrastructure entities (NSE, BSE, MCX, NSDL, CDSL).
+- `server/services/institutional-skeleton-seed.service.ts` — idempotent seeder: creates "Indian Financial System" domain if absent; upserts orgs by name within domain. Preserves any manually added orgs.
+- `server/db/seed.ts` — entrypoint, run via `pnpm db:seed`. Reports drift counts.
 
 ### Cost guardrails
 
@@ -592,6 +604,7 @@ Format: `YYYY-MM-DD — {feat|fix|chore|refactor|docs}({area}): one-line descrip
 
 ### 2026-05-08
 
+- 2026-05-08 — feat(week2): ship Week 2 partial — agent runner + institutional skeleton seed + Agent Operations admin UI. **Files:** `server/services/agent-runner.service.ts` (runner with atomic claim, 60s tick, 5-min timeout, manual trigger), `server/services/cron-utils.ts` (in-house IST-aware parser + next-run computer), `server/db/institutional-skeleton.ts` (54 curated Indian financial institutions), `server/services/institutional-skeleton-seed.service.ts` (idempotent seeder), `server/db/seed.ts` (rewritten entrypoint), `server/routers/agents.router.ts` (6 admin procedures), `client/src/pages/admin/AgentOperations.tsx` (Apple-grade UI per Rule 3 — optimistic toggles, designed loading/empty/error states, AlertDialog for destructive actions, AAA-contrast badges in light/dark, 375px responsive). **Wired:** `server/index.ts` boots `syncAgentRegistry()` then starts runner; `server/routers.ts` registers `agents` namespace; `client/src/App.tsx` adds `/admin/agents` route; `DashboardLayout.tsx` adds nav link. **21 new tests** (cron parser correctness, IST next-run accuracy across DST-free year, skeleton dataset shape, agent-definition coverage). **Bug-check (Rule 1):** 10 passes, 4 fixes, 3 consecutive clean. Fixes — F1: drop wasted SQL placeholder in listSchedules + cast json columns at boundary; F3: optimistic UI on enable/dryRun toggle (Rule 3 #6); F6: overflow-x on runs table for 375px; F7: manual runs touch lastRunAt for UI consistency. **Defers to follow-on session:** 2.1 Apify configs for live ingestion, 2.3-2.5 real ingestion/dedup/change-detection dispatchers (need Apify token + cost-controlled live testing), 2.9 dispatcher integration tests. (commit pending)
 - 2026-05-08 — chore(rules): add **Rule 3 — Apple-grade UX** to `CLAUDE.md`. Senior-executive product means zero tolerance for clutter or jank; every UI surface must feel Apple-designed. Codifies HIG triad (clarity / deference / depth), 16 enforceable principles (one job per surface, zero-state-as-teaching, optimistic UI, designed loading states, error-says-what-why-next, undo over confirm, 44pt targets, motion has meaning, accessibility non-negotiable, voice-first, 80% clean over 100% cluttered, etc.), an 8-point UX self-review checklist (light/dark, keyboard-only, slow 3G, 375px, aria-labels, error paths, ear-test, "they cared" test) added as a 6th lens to Rule 1's bug-check for any `client/` change, and a list of refused anti-patterns (multi-line buttons, "Submit" labels, generic "Are you sure?", spinner-only loading, terminology drift). Existing pages grandfathered until touched. Saved as feedback memory for cross-session persistence. Bug-check: 4 passes, 3 fixes (typo, grandfathering clause, design-token reference), 3 consecutive clean. (commit `02e3250`)
 - 2026-05-08 — chore(rules): codify two new workflow rules in `CLAUDE.md`: **Rule 1** — three consecutive clean bug-check passes required before any task is "done" (rotate lens each pass: correctness → schema → edge cases → security → consistency); **Rule 2** — read MAPS.md before starting + update MAPS.md in the same commit as any code change. Saved as feedback memories for cross-session persistence. (commit `b365425`)
 - 2026-05-08 — fix(schema): bug-check pass on Week 1 strategic spine. **8 findings fixed across 12 passes** (3 consecutive clean to terminate):

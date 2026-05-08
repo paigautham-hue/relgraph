@@ -7,6 +7,8 @@ import { registerOAuthRoutes } from "./_core/oauth";
 import { createContext } from "./_core/context";
 import { appRouter } from "./routers";
 import { serveStatic, setupVite } from "./_core/vite";
+import { syncAgentRegistry } from "./services/agent-registry.service";
+import { startAgentRunner } from "./services/agent-runner.service";
 
 async function startServer() {
   const app = express();
@@ -37,6 +39,26 @@ async function startServer() {
   } else {
     await setupVite(app, server);
   }
+
+  // Boot-time agent registry sync. Idempotent — verifies the canonical 10
+  // agents exist with correct definitions and that each has a default schedule.
+  // Failures here log but don't block server boot (the Agent Operations admin
+  // UI will surface registry drift). See server/services/agent-registry.service.ts
+  // and IMPLEMENTATION_PLAN.md week 2.0.
+  try {
+    const result = await syncAgentRegistry();
+    if (result.created || result.updated || result.schedulesCreated) {
+      console.log(
+        `[boot] Agent registry sync: ${result.created} created, ${result.updated} updated, ${result.schedulesCreated} schedules created`,
+      );
+    }
+  } catch (err) {
+    console.error("[boot] Agent registry sync failed (continuing boot):", err);
+  }
+
+  // Start the agent runner tick. Wakes every minute, finds due schedules,
+  // dispatches them. See server/services/agent-runner.service.ts.
+  startAgentRunner();
 
   server.listen(port, "0.0.0.0", () => {
     console.log(`RelGraph server running on port ${port}`);

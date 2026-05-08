@@ -16,6 +16,7 @@ import AuditLog from "./pages/admin/AuditLog";
 import ContactImportSettings from "./pages/admin/ContactImportSettings";
 import ApifyManagement from "./pages/admin/ApifyManagement";
 import IndianBankDataset from "./pages/admin/IndianBankDataset";
+import AgentOperations from "./pages/admin/AgentOperations";
 import NetworkMap from "./pages/NetworkMap";
 import PathFinder from "./pages/PathFinder";
 import AlertsPage from "./pages/AlertsPage";
@@ -44,6 +45,7 @@ function AppRoutes() {
         <Route path="/admin/contact-import" component={ContactImportSettings} />
         <Route path="/admin/apify" component={ApifyManagement} />
         <Route path="/admin/bank-dataset" component={IndianBankDataset} />
+        <Route path="/admin/agents" component={AgentOperations} />
         <Route path="/admin/audit" component={AuditLog} />
         <Route>
           <div className="flex flex-col items-center justify-center py-24 text-center">

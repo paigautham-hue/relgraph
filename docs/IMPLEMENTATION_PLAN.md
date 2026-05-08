@@ -190,16 +190,18 @@ Each week is a coherent shippable chunk. **MAPS.md must be updated in the same c
 ### Week 2 — Apify watchers + Indian institutional skeleton
 **Goal:** auto-ingested live institutional graph; Day-1 activation works.
 
-- [ ] 2.0 Wire `syncAgentRegistry()` into `server/index.ts` boot path (one-line call after DB pool init). Already implemented in week 1 but not yet called at boot.
-- [ ] 2.1 Promote `apify_source_configs` to production: pre-create configs for RBI press releases, PIB, MCA21, SEBI orders, BSE/NSE filings, Gazette of India
-- [ ] 2.2 Agent runner: `server/services/agent-runner.service.ts` reads `agent_schedules`, executes due agents. MUST skip cron-based scheduling for `is_event_driven=true` agents (see MAPS issue AGENT-CRON-EVENT). MUST treat default crons as IST (see AGENT-CRON-TZ).
-- [ ] 2.3 Ingestion agent implementation: pulls Apify dataset, normalizes, writes to provenance + creates/updates persons & orgs
-- [ ] 2.4 Dedup agent: fuzzy-match on name + org, auto-merge > 0.9
-- [ ] 2.5 Change-detection agent: diff role changes vs prior snapshot, write `power_moves`
-- [ ] 2.6 Seed script: `server/db/seed-institutional-skeleton.ts` — top 50 banks, RBI, SEBI, MoF, top 100 BSE-200 boards (one-time bootstrap)
-- [ ] 2.7 Admin UI: `client/src/pages/admin/AgentOperations.tsx` — schedule, enable, source allowlist, token cap, run-now, dry-run, last-run/cost
-- [ ] 2.8 MAPS.md updated with agent runner, ingestion pipeline
-- [ ] 2.9 Tests: agent runner respects cadence, dry-run skips LLM, token cap pauses agent
+- [x] 2.0 Wire `syncAgentRegistry()` into `server/index.ts` boot path. Also starts `startAgentRunner()` after DB pool init.
+- [ ] 2.1 Promote `apify_source_configs` to production: pre-create configs for RBI press releases, PIB, MCA21, SEBI orders, BSE/NSE filings, Gazette of India *(deferred — needs Apify token + cost-controlled live testing)*
+- [x] 2.2 Agent runner: `server/services/agent-runner.service.ts` + `cron-utils.ts`. Atomic claim via UPDATE-WHERE on `next_run_at`. Skips event-driven agents in WHERE clause. IST-aware via in-house cron parser. Singleton tick every 60s. Per-run timeout 5min. Manual `triggerRunNow()` for admin UI.
+- [ ] 2.3 Ingestion agent dispatcher (RBI/PIB, MCA21/Gazette, BSE/NSE): pulls Apify dataset, normalizes, writes to provenance + creates/updates persons & orgs *(deferred to next session — depends on 2.1)*
+- [ ] 2.4 Dedup agent dispatcher: fuzzy-match on name + org, auto-merge > 0.9 *(deferred to next session)*
+- [ ] 2.5 Change-detection agent dispatcher: diff role changes vs prior snapshot, write `power_moves` *(deferred to next session)*
+- [x] 2.6 Seed script: `server/db/institutional-skeleton.ts` (data) + `server/services/institutional-skeleton-seed.service.ts` (idempotent seeder) + `server/db/seed.ts` (entrypoint). 54 curated organizations: 12 PSBs, 20 private banks, 5 regulators, 5 govt bodies, 7 DFIs, 5 market infra. Run via `pnpm db:seed`.
+- [x] 2.7 Admin UI: `client/src/pages/admin/AgentOperations.tsx` — Apple-grade per Rule 3. Schedule cards with optimistic toggles, inline cron+cap edit, dry-run mode, run-now/dry-run buttons, monthly usage progress bar with semantic colors, AlertDialog for destructive reset, recent runs table with status badges and error tooltips. Designed loading/empty states. 375px responsive.
+- [x] 2.8 MAPS.md updated with agent runner, cron utils, skeleton seed, agents router, AgentOperations page.
+- [x] 2.9 Tests (21 new): cron parser correctness; IST next-run accuracy across edge cases (day rollover, Sunday-only, every-6h, every-minute); skeleton dataset shape (counts, no duplicates, valid types, valid URLs); agent definitions coverage (event-driven flags, user-scoped flags, valid IST crons).
+
+**Week 2 partial ship (this session):** items 2.0, 2.2, 2.6, 2.7, 2.8, 2.9. Items 2.1, 2.3, 2.4, 2.5 deferred to follow-on session — they require live Apify integration with API token and cost-controlled testing. The runner and admin UI are ready to host real dispatchers via `registerAgentDispatcher(name, fn)` once those are implemented.
 
 ### Week 3 — Universal command box + intent router + collapsed IA
 **Goal:** the product takes shape. Three surfaces, one verb.

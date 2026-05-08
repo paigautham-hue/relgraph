@@ -22,6 +22,7 @@ import {
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
+  Activity,
   Bell,
   Bot,
   Building2,
@@ -57,6 +58,7 @@ const adminItems = [
   { icon: UserCog, label: "Users", path: "/admin/users" },
   { icon: Mail, label: "Access Requests", path: "/admin/requests" },
   { icon: Globe, label: "Domains", path: "/admin/domains" },
+  { icon: Activity, label: "Agent Ops", path: "/admin/agents" },
   { icon: Bot, label: "Apify Ops", path: "/admin/apify" },
   { icon: Database, label: "Bank Dataset", path: "/admin/bank-dataset" },
   { icon: ScrollText, label: "Audit Log", path: "/admin/audit" },
