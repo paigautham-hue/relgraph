@@ -34,6 +34,17 @@ import {
   ORG_HIERARCHY_TYPES,
   PERSON_CATEGORIES,
   EXTERNAL_CONNECTION_SOURCES,
+  OPPORTUNITY_STAGES,
+  OPPORTUNITY_LINK_TARGET_TYPES,
+  WATCH_TARGET_TYPES,
+  OWNERSHIP_TIERS,
+  PROVENANCE_SOURCE_TYPES,
+  PROVENANCE_ENTITY_TYPES,
+  AGENT_NAMES,
+  AGENT_RUN_STATUSES,
+  POWER_MOVE_TYPES,
+  DIGEST_CARD_TYPES,
+  VISIBILITY_SCOPES,
 } from '../../shared/enums';
 
 const pgTable = mysqlTable as typeof mysqlTable;
@@ -76,6 +87,19 @@ export const chatRoleEnum = pgEnum('chat_role', CHAT_ROLES);
 export const bankLeadershipRoleEnum = pgEnum('bank_leadership_role', ['chairman', 'managing_director', 'chairman_and_managing_director', 'executive_director', 'other']);
 export const bankLeadershipSourceTypeEnum = pgEnum('bank_leadership_source_type', ['official_bank_website', 'stock_exchange_filing', 'regulator_publication', 'government_release', 'annual_report', 'press_release', 'secondary_reference', 'unknown']);
 export const bankLeadershipValidationStatusEnum = pgEnum('bank_leadership_validation_status', ['pending_review', 'official_source_confirmed', 'secondary_source_only', 'conflict_detected', 'rejected', 'imported']);
+
+// Strategic spine enums (week 1)
+export const opportunityStageEnum = pgEnum('opportunity_stage', OPPORTUNITY_STAGES);
+export const opportunityLinkTargetTypeEnum = pgEnum('opportunity_link_target_type', OPPORTUNITY_LINK_TARGET_TYPES);
+export const watchTargetTypeEnum = pgEnum('watch_target_type', WATCH_TARGET_TYPES);
+export const ownershipTierEnum = pgEnum('ownership_tier', OWNERSHIP_TIERS);
+export const provenanceSourceTypeEnum = pgEnum('provenance_source_type', PROVENANCE_SOURCE_TYPES);
+export const provenanceEntityTypeEnum = pgEnum('provenance_entity_type', PROVENANCE_ENTITY_TYPES);
+export const agentNameEnum = pgEnum('agent_name', AGENT_NAMES);
+export const agentRunStatusEnum = pgEnum('agent_run_status', AGENT_RUN_STATUSES);
+export const powerMoveTypeEnum = pgEnum('power_move_type', POWER_MOVE_TYPES);
+export const digestCardTypeEnum = pgEnum('digest_card_type', DIGEST_CARD_TYPES);
+export const visibilityScopeEnum = pgEnum('visibility_scope', VISIBILITY_SCOPES);
 
 // ─── 1. Users ────────────────────────────────────────────────────────────────
 
@@ -859,3 +883,419 @@ export type InsertApifyRun = typeof apifyRuns.$inferInsert;
 
 export type BankLeadershipRecord = typeof bankLeadershipRecords.$inferSelect;
 export type InsertBankLeadershipRecord = typeof bankLeadershipRecords.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STRATEGIC SPINE — Week 1 additions
+// New tables: opportunities, opportunity_links, watches, ownership, provenance,
+//             power_moves, digest_cards, agent_registry, agent_schedules, agent_runs
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─── 22. Opportunities ───────────────────────────────────────────────────────
+
+export const opportunities = pgTable('opportunities', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+  stage: opportunityStageEnum('stage').notNull().default('identify'),
+  domainId: uuid('domain_id').notNull().references(() => domains.id),
+  ownerId: uuid('owner_id').references(() => users.id),
+  visibilityScope: visibilityScopeEnum('visibility_scope').notNull().default('team'),
+  momentumScore: integer('momentum_score').notNull().default(50),
+  targetCloseDate: date('target_close_date'),
+  lastStageChangeAt: timestamp('last_stage_change_at').notNull().defaultNow(),
+  lastActivityAt: timestamp('last_activity_at').notNull().defaultNow(),
+  isArchived: boolean('is_archived').notNull().default(false),
+  createdBy: uuid('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  index('opportunities_domain_idx').on(table.domainId, table.stage, table.isArchived),
+  index('opportunities_owner_idx').on(table.ownerId, table.stage),
+  index('opportunities_activity_idx').on(table.lastActivityAt),
+]);
+
+// ─── 23. Opportunity Links (polymorphic) ────────────────────────────────────
+
+export const opportunityLinks = pgTable('opportunity_links', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  opportunityId: uuid('opportunity_id').notNull().references(() => opportunities.id),
+  targetType: opportunityLinkTargetTypeEnum('target_type').notNull(),
+  targetId: uuid('target_id').notNull(),
+  role: varchar('role', { length: 64 }),
+  note: text('note'),
+  createdBy: uuid('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => [
+  index('opp_links_opportunity_idx').on(table.opportunityId, table.targetType),
+  index('opp_links_target_idx').on(table.targetType, table.targetId),
+]);
+
+// ─── 24. Watches (user → target) ─────────────────────────────────────────────
+
+export const watches = pgTable('watches', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  targetType: watchTargetTypeEnum('target_type').notNull(),
+  targetId: uuid('target_id'),
+  targetLabel: varchar('target_label', { length: 255 }).notNull(),
+  isActive: boolean('is_active').notNull().default(true),
+  notifyDigest: boolean('notify_digest').notNull().default(true),
+  notifyPush: boolean('notify_push').notNull().default(false),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  index('watches_user_idx').on(table.userId, table.isActive),
+  index('watches_target_idx').on(table.targetType, table.targetId),
+]);
+
+// ─── 25. Ownership (person → owning user) ────────────────────────────────────
+
+export const ownership = pgTable('ownership', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  personId: uuid('person_id').notNull().references(() => persons.id),
+  ownerUserId: uuid('owner_user_id').notNull().references(() => users.id),
+  tier: ownershipTierEnum('tier').notNull().default('tier_2'),
+  assignedBy: uuid('assigned_by').references(() => users.id),
+  assignedAt: timestamp('assigned_at').notNull().defaultNow(),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  index('ownership_person_idx').on(table.personId),
+  index('ownership_owner_idx').on(table.ownerUserId, table.tier),
+]);
+
+// ─── 26. Provenance (polymorphic per-fact) ───────────────────────────────────
+
+export const provenance = pgTable('provenance', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  entityType: provenanceEntityTypeEnum('entity_type').notNull(),
+  entityId: uuid('entity_id').notNull(),
+  fieldName: varchar('field_name', { length: 100 }),
+  sourceType: provenanceSourceTypeEnum('source_type').notNull(),
+  sourceUrl: text('source_url'),
+  sourceLabel: varchar('source_label', { length: 255 }),
+  contentHash: varchar('content_hash', { length: 64 }),
+  capturedBy: uuid('captured_by').references(() => users.id),
+  capturedAt: timestamp('captured_at').notNull().defaultNow(),
+  confidence: real('confidence'),
+  verifiedBy: uuid('verified_by').references(() => users.id),
+  verifiedAt: timestamp('verified_at'),
+  expiresAt: timestamp('expires_at'),
+  metadata: jsonb('metadata'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => [
+  index('provenance_entity_idx').on(table.entityType, table.entityId),
+  index('provenance_hash_idx').on(table.contentHash),
+  index('provenance_expires_idx').on(table.expiresAt),
+]);
+
+// ─── 27. Power Moves (change-detection emit) ─────────────────────────────────
+
+export const powerMoves = pgTable('power_moves', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  type: powerMoveTypeEnum('type').notNull(),
+  headline: varchar('headline', { length: 500 }).notNull(),
+  summary: text('summary'),
+  occurredAt: timestamp('occurred_at').notNull(),
+  detectedAt: timestamp('detected_at').notNull().defaultNow(),
+  primaryPersonId: uuid('primary_person_id').references(() => persons.id),
+  primaryOrgId: uuid('primary_org_id').references(() => organizations.id),
+  fromOrgId: uuid('from_org_id').references(() => organizations.id),
+  toOrgId: uuid('to_org_id').references(() => organizations.id),
+  fromTitle: varchar('from_title', { length: 255 }),
+  toTitle: varchar('to_title', { length: 255 }),
+  sourceUrl: text('source_url'),
+  sourceType: provenanceSourceTypeEnum('source_type').notNull().default('unknown'),
+  agentRunId: uuid('agent_run_id'),
+  confidence: real('confidence'),
+  isPublished: boolean('is_published').notNull().default(true),
+  metadata: jsonb('metadata'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => [
+  index('power_moves_person_idx').on(table.primaryPersonId, table.occurredAt),
+  index('power_moves_org_idx').on(table.primaryOrgId, table.occurredAt),
+  index('power_moves_detected_idx').on(table.detectedAt),
+]);
+
+// ─── 28. Digest Cards (Today feed) ───────────────────────────────────────────
+
+export const digestCards = pgTable('digest_cards', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  type: digestCardTypeEnum('type').notNull(),
+  title: varchar('title', { length: 500 }).notNull(),
+  body: text('body'),
+  rank: integer('rank').notNull().default(100),
+  relatedPersonId: uuid('related_person_id').references(() => persons.id),
+  relatedOrgId: uuid('related_org_id').references(() => organizations.id),
+  relatedOpportunityId: uuid('related_opportunity_id').references(() => opportunities.id),
+  relatedPowerMoveId: uuid('related_power_move_id').references(() => powerMoves.id),
+  actionPayload: jsonb('action_payload'),
+  isDismissed: boolean('is_dismissed').notNull().default(false),
+  dismissedAt: timestamp('dismissed_at'),
+  isActioned: boolean('is_actioned').notNull().default(false),
+  actionedAt: timestamp('actioned_at'),
+  expiresAt: timestamp('expires_at'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => [
+  index('digest_cards_user_idx').on(table.userId, table.isDismissed, table.rank),
+  index('digest_cards_user_created_idx').on(table.userId, table.createdAt),
+  index('digest_cards_expires_idx').on(table.expiresAt),
+]);
+
+// ─── 29. Agent Registry ──────────────────────────────────────────────────────
+
+export const agentRegistry = pgTable('agent_registry', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: agentNameEnum('name').notNull().unique(),
+  displayName: varchar('display_name', { length: 255 }).notNull(),
+  description: text('description'),
+  version: varchar('version', { length: 32 }).notNull().default('1.0.0'),
+  isEnabled: boolean('is_enabled').notNull().default(true),
+  defaultCadenceCron: varchar('default_cadence_cron', { length: 100 }).notNull(),
+  isUserScoped: boolean('is_user_scoped').notNull().default(false),
+  isEventDriven: boolean('is_event_driven').notNull().default(false),
+  defaultTokenCapUsd: real('default_token_cap_usd'),
+  preferredModel: varchar('preferred_model', { length: 64 }),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// ─── 30. Agent Schedules (admin-configurable cadence) ───────────────────────
+
+export const agentSchedules = pgTable('agent_schedules', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  agentId: uuid('agent_id').notNull().references(() => agentRegistry.id),
+  cronExpression: varchar('cron_expression', { length: 100 }).notNull(),
+  isEnabled: boolean('is_enabled').notNull().default(true),
+  isDryRun: boolean('is_dry_run').notNull().default(false),
+  monthlyTokenCapUsd: real('monthly_token_cap_usd'),
+  monthlyTokensUsedUsd: real('monthly_tokens_used_usd').notNull().default(0),
+  monthlyWindowStart: timestamp('monthly_window_start').notNull().defaultNow(),
+  sourceAllowlist: jsonb('source_allowlist'),
+  lastRunAt: timestamp('last_run_at'),
+  nextRunAt: timestamp('next_run_at'),
+  configOverrides: jsonb('config_overrides'),
+  updatedBy: uuid('updated_by').references(() => users.id),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  index('agent_schedules_agent_idx').on(table.agentId),
+  index('agent_schedules_next_run_idx').on(table.isEnabled, table.nextRunAt),
+]);
+
+// ─── 31. Agent Runs (execution history) ─────────────────────────────────────
+
+export const agentRuns = pgTable('agent_runs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  agentId: uuid('agent_id').notNull().references(() => agentRegistry.id),
+  scheduleId: uuid('schedule_id').references(() => agentSchedules.id),
+  scopeUserId: uuid('scope_user_id').references(() => users.id),
+  status: agentRunStatusEnum('status').notNull().default('queued'),
+  triggeredBy: varchar('triggered_by', { length: 32 }).notNull().default('schedule'),
+  triggeredByUserId: uuid('triggered_by_user_id').references(() => users.id),
+  isDryRun: boolean('is_dry_run').notNull().default(false),
+  startedAt: timestamp('started_at'),
+  finishedAt: timestamp('finished_at'),
+  durationMs: integer('duration_ms'),
+  itemsProcessed: integer('items_processed').notNull().default(0),
+  itemsCreated: integer('items_created').notNull().default(0),
+  itemsUpdated: integer('items_updated').notNull().default(0),
+  itemsSkipped: integer('items_skipped').notNull().default(0),
+  tokensUsed: integer('tokens_used').notNull().default(0),
+  costUsd: real('cost_usd').notNull().default(0),
+  modelUsed: varchar('model_used', { length: 64 }),
+  errorMessage: text('error_message'),
+  errorStack: text('error_stack'),
+  output: jsonb('output'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => [
+  index('agent_runs_agent_idx').on(table.agentId, table.createdAt),
+  index('agent_runs_schedule_idx').on(table.scheduleId, table.createdAt),
+  index('agent_runs_status_idx').on(table.status, table.createdAt),
+]);
+
+// ─── Strategic spine relations ───────────────────────────────────────────────
+
+export const opportunitiesRelations = relations(opportunities, ({ one, many }) => ({
+  domain: one(domains, {
+    fields: [opportunities.domainId],
+    references: [domains.id],
+  }),
+  owner: one(users, {
+    fields: [opportunities.ownerId],
+    references: [users.id],
+    relationName: 'opportunityOwner',
+  }),
+  createdByUser: one(users, {
+    fields: [opportunities.createdBy],
+    references: [users.id],
+    relationName: 'opportunityCreator',
+  }),
+  links: many(opportunityLinks),
+  digestCards: many(digestCards),
+}));
+
+export const opportunityLinksRelations = relations(opportunityLinks, ({ one }) => ({
+  opportunity: one(opportunities, {
+    fields: [opportunityLinks.opportunityId],
+    references: [opportunities.id],
+  }),
+  createdByUser: one(users, {
+    fields: [opportunityLinks.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const watchesRelations = relations(watches, ({ one }) => ({
+  user: one(users, {
+    fields: [watches.userId],
+    references: [users.id],
+  }),
+}));
+
+export const ownershipRelations = relations(ownership, ({ one }) => ({
+  person: one(persons, {
+    fields: [ownership.personId],
+    references: [persons.id],
+  }),
+  owner: one(users, {
+    fields: [ownership.ownerUserId],
+    references: [users.id],
+    relationName: 'ownershipOwner',
+  }),
+  assigner: one(users, {
+    fields: [ownership.assignedBy],
+    references: [users.id],
+    relationName: 'ownershipAssigner',
+  }),
+}));
+
+export const provenanceRelations = relations(provenance, ({ one }) => ({
+  capturer: one(users, {
+    fields: [provenance.capturedBy],
+    references: [users.id],
+    relationName: 'provenanceCapturer',
+  }),
+  verifier: one(users, {
+    fields: [provenance.verifiedBy],
+    references: [users.id],
+    relationName: 'provenanceVerifier',
+  }),
+}));
+
+export const powerMovesRelations = relations(powerMoves, ({ one }) => ({
+  primaryPerson: one(persons, {
+    fields: [powerMoves.primaryPersonId],
+    references: [persons.id],
+  }),
+  primaryOrg: one(organizations, {
+    fields: [powerMoves.primaryOrgId],
+    references: [organizations.id],
+    relationName: 'powerMovePrimaryOrg',
+  }),
+  fromOrg: one(organizations, {
+    fields: [powerMoves.fromOrgId],
+    references: [organizations.id],
+    relationName: 'powerMoveFromOrg',
+  }),
+  toOrg: one(organizations, {
+    fields: [powerMoves.toOrgId],
+    references: [organizations.id],
+    relationName: 'powerMoveToOrg',
+  }),
+}));
+
+export const digestCardsRelations = relations(digestCards, ({ one }) => ({
+  user: one(users, {
+    fields: [digestCards.userId],
+    references: [users.id],
+  }),
+  relatedPerson: one(persons, {
+    fields: [digestCards.relatedPersonId],
+    references: [persons.id],
+  }),
+  relatedOrg: one(organizations, {
+    fields: [digestCards.relatedOrgId],
+    references: [organizations.id],
+  }),
+  relatedOpportunity: one(opportunities, {
+    fields: [digestCards.relatedOpportunityId],
+    references: [opportunities.id],
+  }),
+  relatedPowerMove: one(powerMoves, {
+    fields: [digestCards.relatedPowerMoveId],
+    references: [powerMoves.id],
+  }),
+}));
+
+export const agentRegistryRelations = relations(agentRegistry, ({ many }) => ({
+  schedules: many(agentSchedules),
+  runs: many(agentRuns),
+}));
+
+export const agentSchedulesRelations = relations(agentSchedules, ({ one, many }) => ({
+  agent: one(agentRegistry, {
+    fields: [agentSchedules.agentId],
+    references: [agentRegistry.id],
+  }),
+  updater: one(users, {
+    fields: [agentSchedules.updatedBy],
+    references: [users.id],
+  }),
+  runs: many(agentRuns),
+}));
+
+export const agentRunsRelations = relations(agentRuns, ({ one }) => ({
+  agent: one(agentRegistry, {
+    fields: [agentRuns.agentId],
+    references: [agentRegistry.id],
+  }),
+  schedule: one(agentSchedules, {
+    fields: [agentRuns.scheduleId],
+    references: [agentSchedules.id],
+  }),
+  scopeUser: one(users, {
+    fields: [agentRuns.scopeUserId],
+    references: [users.id],
+    relationName: 'agentRunScopeUser',
+  }),
+  triggerUser: one(users, {
+    fields: [agentRuns.triggeredByUserId],
+    references: [users.id],
+    relationName: 'agentRunTriggerUser',
+  }),
+}));
+
+// ─── Strategic spine inferred types ─────────────────────────────────────────
+
+export type Opportunity = typeof opportunities.$inferSelect;
+export type InsertOpportunity = typeof opportunities.$inferInsert;
+
+export type OpportunityLink = typeof opportunityLinks.$inferSelect;
+export type InsertOpportunityLink = typeof opportunityLinks.$inferInsert;
+
+export type Watch = typeof watches.$inferSelect;
+export type InsertWatch = typeof watches.$inferInsert;
+
+export type Ownership = typeof ownership.$inferSelect;
+export type InsertOwnership = typeof ownership.$inferInsert;
+
+export type Provenance = typeof provenance.$inferSelect;
+export type InsertProvenance = typeof provenance.$inferInsert;
+
+export type PowerMove = typeof powerMoves.$inferSelect;
+export type InsertPowerMove = typeof powerMoves.$inferInsert;
+
+export type DigestCard = typeof digestCards.$inferSelect;
+export type InsertDigestCard = typeof digestCards.$inferInsert;
+
+export type AgentRegistry = typeof agentRegistry.$inferSelect;
+export type InsertAgentRegistry = typeof agentRegistry.$inferInsert;
+
+export type AgentSchedule = typeof agentSchedules.$inferSelect;
+export type InsertAgentSchedule = typeof agentSchedules.$inferInsert;
+
+export type AgentRun = typeof agentRuns.$inferSelect;
+export type InsertAgentRun = typeof agentRuns.$inferInsert;

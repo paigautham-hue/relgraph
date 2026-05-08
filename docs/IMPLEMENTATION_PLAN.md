@@ -174,17 +174,18 @@ User signs up with `@manipalgroup.info` → magic-link (or password until email 
 
 Each week is a coherent shippable chunk. **MAPS.md must be updated in the same commit** as any code change.
 
-### Week 1 — Strategic schema foundation
+### Week 1 — Strategic schema foundation ✅ SHIPPED 2026-05-08
 **Goal:** new core tables for opportunities, watches, ownership, provenance, agents.
 
-- [ ] 1.1 Migration `0005_strategic_spine.sql` adding: `opportunities`, `opportunity_links`, `watches`, `ownership`, `provenance`, `power_moves`, `digest_cards`
-- [ ] 1.2 Migration `0006_agent_registry.sql` adding: `agent_registry`, `agent_schedules`, `agent_runs`
-- [ ] 1.3 Drizzle schema additions in `server/db/schema.ts` with relations
-- [ ] 1.4 Shared enums: opportunity stages, provenance source types, agent statuses, watch target types
-- [ ] 1.5 Shared validation schemas (zod) for all new entities
-- [ ] 1.6 Seed `agent_registry` with the 10 agents and default cadences
-- [ ] 1.7 MAPS.md updated with all new tables, enums, and types
-- [ ] 1.8 Tests: schema migration applies cleanly, drizzle types compile
+- [x] 1.1 Migration `0005_strategic_spine.sql` adding: `opportunities`, `opportunity_links`, `watches`, `ownership`, `provenance`, `power_moves`, `digest_cards`
+- [x] 1.2 Migration `0006_agent_registry.sql` adding: `agent_registry`, `agent_schedules`, `agent_runs` + idempotent seed of 10 agents
+- [x] 1.3 Drizzle schema additions in `server/db/schema.ts` with relations and inferred types
+- [x] 1.4 Shared enums: opportunity stages (with state-machine transitions map), provenance source/entity types, agent names + run statuses, watch target types, ownership tiers, power-move types, digest-card types, visibility scopes
+- [x] 1.5 Shared validation schemas (zod) for all new entities — 18 schemas
+- [x] 1.6 Seed `agent_registry` with the 10 agents and default cadences (ingestion + change_detection start DISABLED + dry-run as cost guardrail)
+- [x] 1.7 Runtime sync service (`server/services/agent-registry.service.ts`) for idempotent boot-time registry refresh
+- [x] 1.8 MAPS.md updated with all new tables, enums, types, agents
+- [x] 1.9 Tests: 21 new vitest cases — schema entity exports, stage-transition correctness, Zod schema validation, agent definition guardrails. All passing. `pnpm check` and `pnpm build` green.
 
 ### Week 2 — Apify watchers + Indian institutional skeleton
 **Goal:** auto-ingested live institutional graph; Day-1 activation works.

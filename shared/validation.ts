@@ -4,6 +4,10 @@ import {
   EXTERNAL_CONNECTION_TYPES, INTERACTION_TYPES, PARTICIPANT_ROLES, INPUT_METHODS,
   REFLECTION_CATEGORIES, CONFIDENCE_LEVELS, VISIBILITY_LEVELS, PERSON_CATEGORIES,
   EXTERNAL_CONNECTION_SOURCES, ORG_HIERARCHY_TYPES,
+  OPPORTUNITY_STAGES, OPPORTUNITY_LINK_TARGET_TYPES, WATCH_TARGET_TYPES,
+  OWNERSHIP_TIERS, PROVENANCE_SOURCE_TYPES, PROVENANCE_ENTITY_TYPES,
+  AGENT_NAMES, AGENT_RUN_STATUSES, POWER_MOVE_TYPES, DIGEST_CARD_TYPES,
+  VISIBILITY_SCOPES,
 } from './enums';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, PASSWORD_MIN_LENGTH } from './constants';
 import {
@@ -521,4 +525,166 @@ export const updateAlertSchema = z.object({
   isDismissed: z.boolean().optional(),
   actionTaken: z.boolean().optional(),
   actionNote: z.string().optional(),
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STRATEGIC SPINE — Week 1 validation schemas
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Opportunity
+export const createOpportunitySchema = z.object({
+  name: z.string().min(1).max(255),
+  description: z.string().max(5000).optional(),
+  domainId: z.string().uuid(),
+  ownerId: z.string().uuid().nullable().optional(),
+  visibilityScope: z.enum(VISIBILITY_SCOPES).default('team'),
+  targetCloseDate: z.string().nullable().optional(),
+  stage: z.enum(OPPORTUNITY_STAGES).default('identify'),
+});
+
+export const updateOpportunitySchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(255).optional(),
+  description: z.string().max(5000).nullable().optional(),
+  ownerId: z.string().uuid().nullable().optional(),
+  visibilityScope: z.enum(VISIBILITY_SCOPES).optional(),
+  momentumScore: z.number().int().min(0).max(100).optional(),
+  targetCloseDate: z.string().nullable().optional(),
+  isArchived: z.boolean().optional(),
+});
+
+export const transitionOpportunityStageSchema = z.object({
+  id: z.string().uuid(),
+  toStage: z.enum(OPPORTUNITY_STAGES),
+  note: z.string().max(2000).optional(),
+});
+
+export const opportunityFilterSchema = paginationSchema.extend({
+  domainId: z.string().uuid().optional(),
+  ownerId: z.string().uuid().optional(),
+  stage: z.enum(OPPORTUNITY_STAGES).optional(),
+  isArchived: z.boolean().optional(),
+  search: z.string().optional(),
+});
+
+// Opportunity Link
+export const createOpportunityLinkSchema = z.object({
+  opportunityId: z.string().uuid(),
+  targetType: z.enum(OPPORTUNITY_LINK_TARGET_TYPES),
+  targetId: z.string().uuid(),
+  role: z.string().max(64).optional(),
+  note: z.string().max(2000).optional(),
+});
+
+export const deleteOpportunityLinkSchema = z.object({
+  id: z.string().uuid(),
+});
+
+// Watch
+export const createWatchSchema = z.object({
+  targetType: z.enum(WATCH_TARGET_TYPES),
+  targetId: z.string().uuid().nullable().optional(),
+  targetLabel: z.string().min(1).max(255),
+  notifyDigest: z.boolean().default(true),
+  notifyPush: z.boolean().default(false),
+});
+
+export const updateWatchSchema = z.object({
+  id: z.string().uuid(),
+  isActive: z.boolean().optional(),
+  notifyDigest: z.boolean().optional(),
+  notifyPush: z.boolean().optional(),
+});
+
+export const deleteWatchSchema = z.object({
+  id: z.string().uuid(),
+});
+
+// Ownership
+export const assignOwnershipSchema = z.object({
+  personId: z.string().uuid(),
+  ownerUserId: z.string().uuid(),
+  tier: z.enum(OWNERSHIP_TIERS).default('tier_2'),
+  notes: z.string().max(2000).optional(),
+});
+
+export const transferOwnershipSchema = z.object({
+  personId: z.string().uuid(),
+  newOwnerUserId: z.string().uuid(),
+  notes: z.string().max(2000).optional(),
+});
+
+export const removeOwnershipSchema = z.object({
+  personId: z.string().uuid(),
+});
+
+// Provenance
+export const createProvenanceSchema = z.object({
+  entityType: z.enum(PROVENANCE_ENTITY_TYPES),
+  entityId: z.string().uuid(),
+  fieldName: z.string().max(100).optional(),
+  sourceType: z.enum(PROVENANCE_SOURCE_TYPES),
+  sourceUrl: z.string().url().optional(),
+  sourceLabel: z.string().max(255).optional(),
+  contentHash: z.string().max(64).optional(),
+  confidence: z.number().min(0).max(1).optional(),
+  expiresAt: z.string().datetime().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const verifyProvenanceSchema = z.object({
+  id: z.string().uuid(),
+});
+
+export const provenanceForEntitySchema = z.object({
+  entityType: z.enum(PROVENANCE_ENTITY_TYPES),
+  entityId: z.string().uuid(),
+});
+
+// Power Moves
+export const powerMoveFilterSchema = paginationSchema.extend({
+  type: z.enum(POWER_MOVE_TYPES).optional(),
+  primaryPersonId: z.string().uuid().optional(),
+  primaryOrgId: z.string().uuid().optional(),
+  occurredAfter: z.string().datetime().optional(),
+  occurredBefore: z.string().datetime().optional(),
+});
+
+// Digest Cards
+export const digestFeedSchema = z.object({
+  limit: z.number().int().min(1).max(100).default(50),
+  includeDismissed: z.boolean().default(false),
+});
+
+export const dismissDigestCardSchema = z.object({
+  id: z.string().uuid(),
+});
+
+export const actDigestCardSchema = z.object({
+  id: z.string().uuid(),
+  note: z.string().max(2000).optional(),
+});
+
+// Agent operations
+export const updateAgentScheduleSchema = z.object({
+  id: z.string().uuid(),
+  cronExpression: z.string().min(1).max(100).optional(),
+  isEnabled: z.boolean().optional(),
+  isDryRun: z.boolean().optional(),
+  monthlyTokenCapUsd: z.number().min(0).nullable().optional(),
+  sourceAllowlist: z.array(z.string()).nullable().optional(),
+  configOverrides: z.record(z.string(), z.unknown()).nullable().optional(),
+});
+
+export const runAgentNowSchema = z.object({
+  agentId: z.string().uuid(),
+  isDryRun: z.boolean().default(false),
+  scopeUserId: z.string().uuid().optional(),
+});
+
+export const agentRunFilterSchema = paginationSchema.extend({
+  agentId: z.string().uuid().optional(),
+  scheduleId: z.string().uuid().optional(),
+  status: z.enum(AGENT_RUN_STATUSES).optional(),
+  startedAfter: z.string().datetime().optional(),
 });

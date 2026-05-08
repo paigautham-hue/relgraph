@@ -1,6 +1,6 @@
 # RelGraph MAPS — Single Source of Truth
 
-**Last updated:** 2026-05-08
+**Last updated:** 2026-05-08 (Week 1 schema foundation shipped)
 **Update rule:** Every PR that adds/changes/removes code MUST update the relevant section in this file in the same commit. PR is not done until MAPS reflects reality. See `CLAUDE.md` for enforcement.
 
 This file is the authoritative map of the codebase. Read it first when picking up work. When in doubt, MAPS wins over memory; code wins over MAPS — fix MAPS if reality has drifted.
@@ -132,27 +132,48 @@ Schema file: `server/db/schema.ts`.
 | `0002_bank_leadership_records_recovery.sql` | Recovery fix |
 | `0003_audit_log_recovery.sql` | Missing audit_log table |
 | `0004_missing_core_tables_recovery.sql` | Core tables (relationships, etc.) |
+| `0005_strategic_spine.sql` | Opportunities, opportunity_links, watches, ownership, provenance, power_moves, digest_cards |
+| `0006_agent_registry.sql` | Agent registry, schedules, runs + idempotent seed of 10 canonical agents |
 
-### Planned new tables (week 1)
+**Migration application:** Drizzle journal (`drizzle/meta/_journal.json`) tracks 0000 and 0001. Migrations 0002+ are recovery / additive scripts applied via `pnpm db:push` (which diffs schema and applies changes) or manually via raw SQL during incident response. `_journal.json` is intentionally not advanced past 0001 — migration files in this repo are descriptive-of-state rather than strictly sequenced.
 
-| Table | Purpose |
-|---|---|
-| `opportunities` | First-class business initiatives with stage state machine |
-| `opportunity_links` | Polymorphic: opportunity → person | org | interaction |
-| `watches` | User → (person | org | sector). Drives digest + alerts |
-| `ownership` | Person → owning_user (Tier-1 must be owned) |
-| `provenance` | Polymorphic per-fact: source, captured_by, captured_at, confidence, verified_by, expires_at |
-| `power_moves` | Detected role/board changes from change-detection agent |
-| `digest_cards` | Generated cards for daily action feed |
-| `agent_registry` | Catalog of background agents |
-| `agent_schedules` | Per-agent cron + token cap (admin-configurable) |
-| `agent_runs` | Execution history with cost + status |
+### Strategic spine tables (✅ shipped week 1)
+
+Migrations: `drizzle/0005_strategic_spine.sql`, `drizzle/0006_agent_registry.sql`.
+
+| Table | Status | Purpose | Key columns |
+|---|---|---|---|
+| `opportunities` | ✅ | First-class business initiatives with 7-stage state machine | id, name, description, stage, domainId, ownerId, visibilityScope, momentumScore, targetCloseDate, lastStageChangeAt, lastActivityAt, isArchived, createdBy |
+| `opportunity_links` | ✅ | Polymorphic links: opportunity → person/organization/interaction | opportunityId, targetType, targetId, role, note |
+| `watches` | ✅ | User → person/org/sector/role subscription | userId, targetType, targetId, targetLabel, isActive, notifyDigest, notifyPush |
+| `ownership` | ✅ | Person → owning user (UNIQUE on personId — one owner per person) | personId, ownerUserId, tier, assignedBy, notes |
+| `provenance` | ✅ | Polymorphic per-fact: source, captured-by, confidence, expires-at | entityType, entityId, fieldName, sourceType, sourceUrl, contentHash, capturedBy, confidence, verifiedBy, expiresAt |
+| `power_moves` | ✅ | Detected role/board changes from change-detection agent | type, headline, summary, occurredAt, primaryPersonId, primaryOrgId, fromOrgId, toOrgId, fromTitle, toTitle, sourceType, agentRunId, confidence |
+| `digest_cards` | ✅ | Cards for Today action feed | userId, type, title, body, rank, relatedPersonId, relatedOrgId, relatedOpportunityId, relatedPowerMoveId, isDismissed, isActioned, expiresAt |
+| `agent_registry` | ✅ | Catalog of 10 canonical background agents | name (unique), displayName, defaultCadenceCron, isUserScoped, isEventDriven, defaultTokenCapUsd, preferredModel |
+| `agent_schedules` | ✅ | Per-agent cron + token cap (admin-configurable) | agentId, cronExpression, isEnabled, isDryRun, monthlyTokenCapUsd, monthlyTokensUsedUsd, sourceAllowlist, lastRunAt, nextRunAt |
+| `agent_runs` | ✅ | Execution history with status, items processed, tokens, cost | agentId, scheduleId, scopeUserId, status, triggeredBy, isDryRun, durationMs, itemsProcessed, itemsCreated, itemsUpdated, itemsSkipped, tokensUsed, costUsd, modelUsed, errorMessage |
+
+**Total tables:** 32 (was 22).
 
 ### Enums (`shared/enums.ts`)
 
-USER_ROLES, ORG_TYPES, TENURE_SOURCES, RELATIONSHIP_TYPES, STRENGTH_LABELS, EXTERNAL_CONNECTION_TYPES, INTERACTION_TYPES, PARTICIPANT_ROLES, INPUT_METHODS, REFLECTION_CATEGORIES, CONFIDENCE_LEVELS, VISIBILITY_LEVELS, PERSON_CATEGORIES, EXTERNAL_CONNECTION_SOURCES, ORG_HIERARCHY_TYPES, AUDIT_ACTION_TYPES, AUDIT_ENTITY_TYPES, ALERT_TYPES, ALERT_SEVERITIES, CHAT_ROLES, bankLeadershipRole, bankLeadershipSourceType, bankLeadershipValidationStatus.
+**Pre-existing:** USER_ROLES, ORG_TYPES, TENURE_SOURCES, RELATIONSHIP_TYPES, STRENGTH_LABELS, EXTERNAL_CONNECTION_TYPES, INTERACTION_TYPES, PARTICIPANT_ROLES, INPUT_METHODS, REFLECTION_CATEGORIES, CONFIDENCE_LEVELS, VISIBILITY_LEVELS, PERSON_CATEGORIES, EXTERNAL_CONNECTION_SOURCES, ORG_HIERARCHY_TYPES, AUDIT_ACTION_TYPES, AUDIT_ENTITY_TYPES, ALERT_TYPES, ALERT_SEVERITIES, CHAT_ROLES, bankLeadershipRole, bankLeadershipSourceType, bankLeadershipValidationStatus.
 
-**Planned additions (week 1):** OPPORTUNITY_STAGES, PROVENANCE_SOURCE_TYPES, AGENT_STATUSES, AGENT_NAMES, WATCH_TARGET_TYPES, OWNERSHIP_TIERS.
+**Strategic spine (✅ shipped week 1):**
+- `OPPORTUNITY_STAGES` — `identify | map | approach | engage | close | maintain | lost`
+- `OPPORTUNITY_STAGE_TRANSITIONS` — explicit valid-transition map (state machine)
+- `OPPORTUNITY_LINK_TARGET_TYPES` — `person | organization | interaction`
+- `WATCH_TARGET_TYPES` — `person | organization | sector | role`
+- `OWNERSHIP_TIERS` — `tier_1 | tier_2 | tier_3 | tier_4`
+- `PROVENANCE_SOURCE_TYPES` — 20 source types (RBI, PIB, MCA21, voice_capture, etc.)
+- `PROVENANCE_ENTITY_TYPES` — 10 polymorphic entity targets
+- `AGENT_NAMES` — 10 canonical agents
+- `AGENT_RUN_STATUSES` — `queued | running | completed | failed | skipped | budget_exhausted | dry_run`
+- `POWER_MOVE_TYPES` — `role_change | board_appointment | board_exit | committee_appointment | company_formation | regulatory_action | major_filing | public_statement | other`
+- `DIGEST_CARD_TYPES` — 10 card types for the Today feed
+- `VISIBILITY_SCOPES` — `private | team | org`
+- `STRATEGIC_AUDIT_ENTITY_TYPES` — extension list for audit_log when actions affect new entities
 
 ---
 
@@ -305,20 +326,27 @@ Root router: `server/routers.ts` — composes 20 sub-routers under `appRouter`.
 
 ## 7. Background agents & schedules
 
-### Agent registry (planned, week 1-2 build)
+### Agent registry
 
-| Agent name | Default cadence | Job | Status |
-|---|---|---|---|
-| `ingestion_rbi_pib` | Every 6h | Pull RBI press releases + PIB | 📋 |
-| `ingestion_mca21_gazette` | Daily 02:00 IST | Pull MCA21 corporate filings + Gazette | 📋 |
-| `ingestion_bse_nse` | Daily 20:00 IST | Post-market disclosure pull | 📋 |
-| `change_detection` | Daily 04:00 IST | Diff prior 24h, emit power_moves | 📋 |
-| `dedup` | On write | Fuzzy-match new entities, auto-merge >0.9 | 📋 |
-| `enrichment` | Weekly Sun 03:00 IST | Backfill missing fields | 📋 |
-| `path_recompute` | Event-driven (graph change) | Re-run cached paths affected by moved nodes | 📋 |
-| `brief` | Daily 05:00 IST per user | Pre-build tomorrow's meeting briefings | 📋 |
-| `trust_auditor` | Weekly Sun 04:00 IST | Demote stale facts past expires_at | 📋 |
-| `digest` | Daily 06:00 IST per user | Assemble Today action feed | 📋 |
+Defined in `server/services/agent-registry.service.ts:AGENT_DEFINITIONS`. Synced to DB on boot via `syncAgentRegistry()` (idempotent — safe to run on every server start). Per-schedule customisations (cron, enabled, token cap) set via Agent Operations UI are preserved.
+
+**Cost guardrails baked into seed:**
+- All ingestion agents start `is_enabled = false` and `is_dry_run = true`. Admin must explicitly enable after reviewing cost projections.
+- Change-detection starts disabled (depends on ingestion).
+- User-facing agents (digest, brief, dedup, path_recompute, trust_auditor, enrichment) start enabled.
+
+| Agent name | Default cadence | Start state | Token cap (USD/mo) | Model | Status |
+|---|---|---|---|---|---|
+| `ingestion_rbi_pib` | `0 */6 * * *` (every 6h) | Off, dry-run | 50 | haiku | ✅ schema, 📋 implementation week 2 |
+| `ingestion_mca21_gazette` | `0 2 * * *` (02:00 IST) | Off, dry-run | 30 | haiku | ✅ schema, 📋 week 2 |
+| `ingestion_bse_nse` | `0 20 * * *` (20:00 IST) | Off, dry-run | 40 | haiku | ✅ schema, 📋 week 2 |
+| `change_detection` | `0 4 * * *` (04:00 IST) | Off | 20 | sonnet | ✅ schema, 📋 week 2 |
+| `dedup` | `* * * * *` (event-driven) | On | 10 | haiku | ✅ schema, 📋 week 2 |
+| `enrichment` | `0 3 * * 0` (Sun 03:00) | Off | 15 | haiku | ✅ schema, 📋 week 2 |
+| `path_recompute` | event-driven | On | 5 | none | ✅ schema, 📋 week 6 |
+| `brief` | `0 5 * * *` per user | On | 25 | sonnet | ✅ schema, 📋 week 6 |
+| `trust_auditor` | `0 4 * * 0` (Sun 04:00) | On | 5 | haiku | ✅ schema, 📋 week 6 |
+| `digest` | `0 6 * * *` per user | On | 20 | sonnet | ✅ schema, 📋 week 6 |
 
 ### Cost guardrails
 
@@ -558,4 +586,5 @@ Format: `YYYY-MM-DD — {feat|fix|chore|refactor|docs}({area}): one-line descrip
 
 ### 2026-05-08
 
-- 2026-05-08 — docs(plan): create IMPLEMENTATION_PLAN.md and MAPS.md with full audit of existing 22 tables, 20 routers, 19 pages, voice + Apify state. Establish update rule in CLAUDE.md (commit pending)
+- 2026-05-08 — feat(schema): Week 1 strategic spine ships. Add 10 new tables (opportunities, opportunity_links, watches, ownership, provenance, power_moves, digest_cards, agent_registry, agent_schedules, agent_runs) + 12 new enum sets + 18 new Zod validation schemas + 11 new TypeScript types. Drizzle migrations 0005, 0006 with idempotent seed of 10 canonical agents (ingestion agents start disabled+dry-run as cost guardrail). New `agent-registry.service.ts` provides boot-time registry sync. 21 new vitest cases covering schema exports, stage transitions, validation rules, agent guardrails — all passing. `pnpm check` and `pnpm build` green. (commit pending)
+- 2026-05-08 — docs(plan): create IMPLEMENTATION_PLAN.md and MAPS.md with full audit of existing 22 tables, 20 routers, 19 pages, voice + Apify state. Establish MAPS-update rule in CLAUDE.md. (commit `318116c`)

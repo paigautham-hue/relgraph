@@ -85,3 +85,147 @@ export type PersonCategory = (typeof PERSON_CATEGORIES)[number];
 // External connection source
 export const EXTERNAL_CONNECTION_SOURCES = ['team_input', 'reflection_extracted', 'auto_scraped'] as const;
 export type ExternalConnectionSource = (typeof EXTERNAL_CONNECTION_SOURCES)[number];
+
+// ─── Strategic Spine (week 1) ────────────────────────────────────────────────
+
+// Opportunity stages — state machine for business initiatives
+export const OPPORTUNITY_STAGES = ['identify', 'map', 'approach', 'engage', 'close', 'maintain', 'lost'] as const;
+export type OpportunityStage = (typeof OPPORTUNITY_STAGES)[number];
+
+// Valid stage transitions (forward + backward + lost from any active stage)
+export const OPPORTUNITY_STAGE_TRANSITIONS: Record<OpportunityStage, OpportunityStage[]> = {
+  identify: ['map', 'lost'],
+  map: ['identify', 'approach', 'lost'],
+  approach: ['map', 'engage', 'lost'],
+  engage: ['approach', 'close', 'lost'],
+  close: ['engage', 'maintain', 'lost'],
+  maintain: ['close', 'lost'],
+  lost: ['identify'],
+};
+
+// Opportunity link target types — polymorphic links from opportunity to other entities
+export const OPPORTUNITY_LINK_TARGET_TYPES = ['person', 'organization', 'interaction'] as const;
+export type OpportunityLinkTargetType = (typeof OPPORTUNITY_LINK_TARGET_TYPES)[number];
+
+// Watch target types — what a user can subscribe to
+export const WATCH_TARGET_TYPES = ['person', 'organization', 'sector', 'role'] as const;
+export type WatchTargetType = (typeof WATCH_TARGET_TYPES)[number];
+
+// Ownership tiers — drives stay-connected expectations and "no owner" alerts
+export const OWNERSHIP_TIERS = ['tier_1', 'tier_2', 'tier_3', 'tier_4'] as const;
+export type OwnershipTier = (typeof OWNERSHIP_TIERS)[number];
+
+// Provenance source types — how a fact entered the system
+export const PROVENANCE_SOURCE_TYPES = [
+  'voice_capture',
+  'text_capture',
+  'manual_form',
+  'apify_scrape',
+  'public_news',
+  'rbi_release',
+  'pib_release',
+  'mca21_filing',
+  'sebi_order',
+  'bse_filing',
+  'nse_filing',
+  'gazette_notification',
+  'annual_report',
+  'press_release',
+  'email_forward',
+  'csv_import',
+  'ai_extraction',
+  'team_member',
+  'system',
+  'unknown',
+] as const;
+export type ProvenanceSourceType = (typeof PROVENANCE_SOURCE_TYPES)[number];
+
+// Provenance entity types — polymorphic: which entity does this fact attach to
+export const PROVENANCE_ENTITY_TYPES = [
+  'person',
+  'organization',
+  'tenure',
+  'relationship',
+  'interaction',
+  'reflection',
+  'note',
+  'intel_field',
+  'opportunity',
+  'power_move',
+] as const;
+export type ProvenanceEntityType = (typeof PROVENANCE_ENTITY_TYPES)[number];
+
+// Agent names — canonical list of background workers
+export const AGENT_NAMES = [
+  'ingestion_rbi_pib',
+  'ingestion_mca21_gazette',
+  'ingestion_bse_nse',
+  'change_detection',
+  'dedup',
+  'enrichment',
+  'path_recompute',
+  'brief',
+  'trust_auditor',
+  'digest',
+] as const;
+export type AgentName = (typeof AGENT_NAMES)[number];
+
+// Agent run statuses — execution lifecycle
+export const AGENT_RUN_STATUSES = [
+  'queued',
+  'running',
+  'completed',
+  'failed',
+  'skipped',
+  'budget_exhausted',
+  'dry_run',
+] as const;
+export type AgentRunStatus = (typeof AGENT_RUN_STATUSES)[number];
+
+// Power-move types — what change-detection agents emit
+export const POWER_MOVE_TYPES = [
+  'role_change',
+  'board_appointment',
+  'board_exit',
+  'committee_appointment',
+  'company_formation',
+  'regulatory_action',
+  'major_filing',
+  'public_statement',
+  'other',
+] as const;
+export type PowerMoveType = (typeof POWER_MOVE_TYPES)[number];
+
+// Digest card types — what shows up in the Today feed
+export const DIGEST_CARD_TYPES = [
+  'power_move',
+  'briefing',
+  'follow_up',
+  'stale_relationship',
+  'new_path',
+  'team_intel',
+  'opportunity_stall',
+  'no_owner',
+  'opportunity_momentum',
+  'watchlist_hit',
+] as const;
+export type DigestCardType = (typeof DIGEST_CARD_TYPES)[number];
+
+// Visibility scope for opportunities/watches/notes — multi-user trust
+export const VISIBILITY_SCOPES = ['private', 'team', 'org'] as const;
+export type VisibilityScope = (typeof VISIBILITY_SCOPES)[number];
+
+// Audit entity types — extend the existing list with new entities
+// (used by audit_log when actions affect new entities)
+export const STRATEGIC_AUDIT_ENTITY_TYPES = [
+  'opportunity',
+  'opportunity_link',
+  'watch',
+  'ownership',
+  'provenance',
+  'power_move',
+  'digest_card',
+  'agent_schedule',
+  'agent_run',
+] as const;
+export type StrategicAuditEntityType = (typeof STRATEGIC_AUDIT_ENTITY_TYPES)[number];
