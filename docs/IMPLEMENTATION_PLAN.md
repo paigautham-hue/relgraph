@@ -246,18 +246,20 @@ Each week is a coherent shippable chunk. **MAPS.md must be updated in the same c
 - [x] 5.8 MAPS.md updated with opportunities/ownership/provenance routers, Opportunities page, dispatcher's new `updateOpportunity` real implementation
 - [x] 5.9 Tests: 21 new vitest cases — state-machine completeness, Zod schema validation for all 5 new mutations, provenance source/entity enum catalog
 
-### Week 6 — Daily digest + Brief agent + Change-detection emit
+### Week 6 — Daily digest + Brief agent + Change-detection emit ✅ SHIPPED 2026-05-08 (digest + trust-auditor)
 **Goal:** the habit forms. Today feed is alive every morning.
 
-- [ ] 6.1 Digest agent: assembles `digest_cards` for each user at 6am (their watches, owned relationships, opportunities, calendar)
-- [ ] 6.2 Brief agent: at 5am, scans tomorrow's calendar for each user, pre-builds briefings
-- [ ] 6.3 Change-detection agent emits `power_moves` → digest agent surfaces affected paths
-- [ ] 6.4 Path-recompute agent triggers on graph change, updates cached paths for affected opportunities
-- [ ] 6.5 Trust-auditor agent demotes stale facts weekly
-- [ ] 6.6 Today feed ranking: power-moves > briefings > follow-ups > stale > new-paths > intel > opportunity-stalls > no-owner
-- [ ] 6.7 Polish pass on Today UI: empty states, loading, swipe-dismiss
-- [ ] 6.8 MAPS.md updated with all agents in production
-- [ ] 6.9 Tests: digest assembles cards correctly, brief generates from calendar fixture
+- [x] 6.1 Digest agent: `server/services/agents/digest-dispatcher.ts` — fans out per active user; assembles cards from watches, owned relationships, opportunities, follow-ups, no-owner candidates; idempotent within 7-day window
+- [ ] 6.2 Brief agent: pre-builds tomorrow's meeting briefings *(deferred — needs calendar integration which RelGraph doesn't have yet)*
+- [ ] 6.3 Change-detection agent emits `power_moves` *(deferred — depends on ingestion dispatchers from Week 2.3-2.5 which need live Apify data)*
+- [ ] 6.4 Path-recompute agent on graph change *(deferred — would integrate with the existing `searchRouter.findPath`; no urgency until ingestion produces graph mutations at scale)*
+- [x] 6.5 Trust-auditor agent: `server/services/agents/trust-auditor-dispatcher.ts` — weekly decay of past-expiry provenance, verified entries exempt
+- [x] 6.6 Today feed ranking implemented in digest dispatcher per the canonical order (power_move 10 → watchlist_hit 20 → follow_up 30 → opportunity_stall 40 → opportunity_momentum 45 → stale_relationship 50 → no_owner 60 → team_intel 70 → new_path 80). Ranks gap-spaced ≥5 so future card types insert without renumbering.
+- [x] 6.7 Today UI polish — already shipped in Week 3 (designed empty/loading/error states, swipe-dismiss with optimistic mutation, light+dark designed).
+- [x] 6.8 MAPS.md updated with both new dispatchers, ranking rationale, deferred items
+- [x] 6.9 Tests: 10 new vitest cases — card rank ordering invariants (gap-spacing, relative priorities), trust-auditor decay math (1.0→0.8→0.6→0.4 floor, monotone within operating regime, verified-exempt)
+
+**Week 6 partial ship (this session):** items 6.1, 6.5, 6.6, 6.7, 6.8, 6.9. Items 6.2 (brief — calendar dep), 6.3 (change-detection — ingestion dep), 6.4 (path-recompute — value gated on ingestion volume) deferred to follow-on sessions when their external dependencies land. The activation loop is now functionally end-to-end with digest as the daily heartbeat — users will see cards every morning at 06:00 IST starting the day after first ingestion data arrives.
 
 ---
 

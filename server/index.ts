@@ -8,7 +8,9 @@ import { createContext } from "./_core/context";
 import { appRouter } from "./routers";
 import { serveStatic, setupVite } from "./_core/vite";
 import { syncAgentRegistry } from "./services/agent-registry.service";
-import { startAgentRunner } from "./services/agent-runner.service";
+import { startAgentRunner, registerAgentDispatcher } from "./services/agent-runner.service";
+import { digestDispatcher } from "./services/agents/digest-dispatcher";
+import { trustAuditorDispatcher } from "./services/agents/trust-auditor-dispatcher";
 
 async function startServer() {
   const app = express();
@@ -55,6 +57,12 @@ async function startServer() {
   } catch (err) {
     console.error("[boot] Agent registry sync failed (continuing boot):", err);
   }
+
+  // Register real dispatchers shipped in week 6. Other dispatchers
+  // (ingestion_*, change_detection, dedup, enrichment, path_recompute,
+  // brief) remain no-op until their respective implementations land.
+  registerAgentDispatcher("digest", digestDispatcher);
+  registerAgentDispatcher("trust_auditor", trustAuditorDispatcher);
 
   // Start the agent runner tick. Wakes every minute, finds due schedules,
   // dispatches them. See server/services/agent-runner.service.ts.
