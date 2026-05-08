@@ -203,18 +203,18 @@ Each week is a coherent shippable chunk. **MAPS.md must be updated in the same c
 
 **Week 2 partial ship (this session):** items 2.0, 2.2, 2.6, 2.7, 2.8, 2.9. Items 2.1, 2.3, 2.4, 2.5 deferred to follow-on session — they require live Apify integration with API token and cost-controlled testing. The runner and admin UI are ready to host real dispatchers via `registerAgentDispatcher(name, fn)` once those are implemented.
 
-### Week 3 — Universal command box + intent router + collapsed IA
+### Week 3 — Universal command box + intent router + collapsed IA ✅ SHIPPED 2026-05-08
 **Goal:** the product takes shape. Three surfaces, one verb.
 
-- [ ] 3.1 New `client/src/pages/Today.tsx` with command box at top + card feed
-- [ ] 3.2 New `client/src/pages/Graph.tsx` consolidating PersonList + OrganizationList + NetworkMap + PathFinder behind filter chips
-- [ ] 3.3 Intent router: `server/services/intent-router.service.ts` using Claude Haiku, returns `{tool, args}` from utterance
-- [ ] 3.4 Eight tool implementations wired to existing routers: `findPath, briefPerson, logInteraction, searchIntel, updateOpportunity, addToWatchlist, whoOwns, coverageGap`
-- [ ] 3.5 Card components: `PowerMoveCard, BriefingCard, FollowUpCard, StaleCard, NewPathCard, IntelCard, OpportunityStallCard, NoOwnerCard`
-- [ ] 3.6 New tRPC `today.router.ts`: `feed()` — returns ranked cards, `dismissCard()`, `actCard()`
-- [ ] 3.7 Route `/` → Today (was Dashboard); old pages remain accessible via Graph filters
-- [ ] 3.8 MAPS.md updated with new IA, intent router, tools, cards
-- [ ] 3.9 Tests: intent router returns correct tool for sample utterances, today.feed returns ranked cards
+- [x] 3.1 New `client/src/pages/Today.tsx` with command box at top + ranked digest-card feed + designed empty state with 3 starter prompts
+- [x] 3.2 New `client/src/pages/Graph.tsx` consolidating PersonList + OrganizationList + NetworkMap + PathFinder behind filter chips
+- [x] 3.3 Intent router: `server/services/intent-router.service.ts` using Claude Haiku 4.5, returns `{tool, args, confidence, rationale}` from utterance with defensive JSON parsing
+- [x] 3.4 Eight tool implementations in `server/services/command-dispatcher.service.ts`: findPath, briefPerson, logInteraction (auto-extracts persons), searchIntel, updateOpportunity (returns pending until week 5), addToWatchlist (heuristic targetType classification), whoOwns, coverageGap. Never throws — wraps errors in `kind: 'error'`.
+- [x] 3.5 DigestCard component renders all 10 card types via meta map (one component, 10 visual themes — premature abstraction avoided per Rule 3 #16)
+- [x] 3.6 New tRPC `today.router.ts`: `feed()` ranked cards with related-entity joins, `dismissCard()`, `actCard()`, `command()` (classify+dispatch in one call), `classify()` (preview-only)
+- [x] 3.7 Route `/` → Today (Dashboard moved to `/dashboard`); legacy pages remain at `/persons`, `/organizations`, etc. for deep linking
+- [x] 3.8 MAPS.md updated with new IA, intent router, dispatcher, today router, Today/Graph/CommandBox/DigestCard
+- [x] 3.9 Tests: 13 new vitest cases — intent catalog stable, empty-input short-circuit (no API call), every dispatcher tool's error/pending path returns the right `kind`
 
 ### Week 4 — Voice stack ported from Meridian
 **Goal:** voice as a first-class input everywhere.

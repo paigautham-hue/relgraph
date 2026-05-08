@@ -20,6 +20,7 @@ import { briefingsRouter } from "./routers/briefings.router";
 import { alertsRouter } from "./routers/alerts.router";
 import { apifyRouter } from "./routers/apify.router";
 import { agentsRouter } from "./routers/agents.router";
+import { todayRouter } from "./routers/today.router";
 
 export const appRouter = router({
   system: systemRouter,
@@ -43,6 +44,7 @@ export const appRouter = router({
   alerts: alertsRouter,
   apify: apifyRouter,
   agents: agentsRouter,
+  today: todayRouter,
 });
 
 export type AppRouter = typeof appRouter;

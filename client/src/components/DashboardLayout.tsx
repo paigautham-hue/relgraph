@@ -35,6 +35,7 @@ import {
   Network,
   PanelLeft,
   ScrollText,
+  Sparkles,
   Target,
   UserCog,
   Users,
@@ -45,10 +46,11 @@ import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  { icon: Sparkles, label: "Today", path: "/" },
+  { icon: Network, label: "Graph", path: "/graph" },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: Users, label: "People", path: "/persons" },
   { icon: Building2, label: "Organizations", path: "/organizations" },
-  { icon: Network, label: "Network Map", path: "/network" },
   { icon: Target, label: "Path Finder", path: "/paths" },
   { icon: Bell, label: "Alerts", path: "/alerts" },
   { icon: FileText, label: "Briefings", path: "/briefings" },

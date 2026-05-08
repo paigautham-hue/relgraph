@@ -7,6 +7,8 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import DashboardLayout from "./components/DashboardLayout";
 import LoginPage from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import TodayPage from "./pages/Today";
+import GraphPage from "./pages/Graph";
 import PersonList from "./pages/PersonList";
 import PersonProfile from "./pages/PersonProfile";
 import UserManagement from "./pages/admin/UserManagement";
@@ -30,7 +32,10 @@ function AppRoutes() {
   return (
     <DashboardLayout>
       <Switch>
-        <Route path="/" component={Dashboard} />
+        <Route path="/" component={TodayPage} />
+        <Route path="/today" component={TodayPage} />
+        <Route path="/graph" component={GraphPage} />
+        <Route path="/dashboard" component={Dashboard} />
         <Route path="/persons" component={PersonList} />
         <Route path="/persons/import-history" component={PersonImportHistory} />
         <Route path="/organizations" component={OrganizationList} />

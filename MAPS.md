@@ -1,6 +1,6 @@
 # RelGraph MAPS — Single Source of Truth
 
-**Last updated:** 2026-05-08 (Week 2 partial — agent runner + skeleton seed + Agent Ops UI shipped)
+**Last updated:** 2026-05-08 (Week 3 — Today + Graph + universal command box shipped)
 **Update rule:** Every PR that adds/changes/removes code MUST update the relevant section in this file in the same commit. PR is not done until MAPS reflects reality. See `CLAUDE.md` for enforcement.
 
 This file is the authoritative map of the codebase. Read it first when picking up work. When in doubt, MAPS wins over memory; code wins over MAPS — fix MAPS if reality has drifted.
@@ -83,10 +83,14 @@ This file is the authoritative map of the codebase. Read it first when picking u
 
 | Route | Page | Status |
 |---|---|---|
-| `/` | Today.tsx — command box + card feed | 📋 |
-| `/graph` | Graph.tsx — unified people/orgs/opps | 📋 |
+| `/` | Today.tsx — command box + card feed | ✅ shipped week 3 |
+| `/today` | Today.tsx (alias) | ✅ |
+| `/graph` | Graph.tsx — unified people/orgs/network/paths via filter chips | ✅ shipped week 3 |
+| `/dashboard` | Dashboard.tsx (legacy stats; reachable via sidebar) | ✅ grandfathered |
 | `/settings/*` | preferences, watches, team admin, agent ops | 📋 |
 | `/login` | Login.tsx | ✅ |
+
+**Week 3 sidebar nav** (top-down): Today → Graph → Dashboard → People → Organizations → Path Finder → Alerts → Briefings. Today is the new home. Graph is the canonical "browse" surface; legacy /persons, /organizations, /network, /paths still mounted for deep linking.
 
 ---
 
@@ -204,6 +208,7 @@ Root router: `server/routers.ts` — composes 20 sub-routers under `appRouter`.
 | `alerts` | list, dismiss, markAction | 44 lines |
 | `apify` | listSourceConfigs, getSourceConfig, createSourceConfig, updateSourceConfig, listRuns, getRun, runSource, applyDiscovery, applyEnrichment, syncMonitoring, listBankLeadershipRecords, getBankLeadershipRecord, updateBankLeadershipRecord, createBankLeadershipRecord, importBankLeadershipRecord, getIndianBankTargets, previewIndianBankSeed, seedIndianBankOrganizations | 146 lines |
 | `agents` | listRegistry, listSchedules, updateSchedule, listRuns, runNow, resetMonthlyUsage (admin) | week 2: 250 lines — drives the Agent Operations admin UI |
+| `today` | feed, dismissCard, actCard, command, classify (protected) | **week 3: 175 lines** — drives Today action feed and universal command box. `command` runs intent router → dispatcher in one round-trip; `classify` is the cheap preview-only call. |
 
 ### Planned new routers (weeks 1-6)
 
@@ -258,6 +263,15 @@ Root router: `server/routers.ts` — composes 20 sub-routers under `appRouter`.
 | IndianBankDataset.tsx | Bank leadership records + validation |
 | AuditLog.tsx | Audit table with filters |
 | AgentOperations.tsx | **(week 2)** Agent schedules + recent runs admin page. Optimistic UI on toggles; designed loading/empty states; AlertDialog for monthly-usage reset. 700 lines. |
+
+**Week 3 additions:**
+
+| File | Purpose |
+|---|---|
+| client/src/pages/Today.tsx | Homepage — command box + ranked digest-card feed + 3 starter prompts in empty state. ~140 lines. |
+| client/src/pages/Graph.tsx | Unified browse surface: People / Organizations / Network / Paths behind filter chips. Wraps existing pages without duplicating code. ~70 lines. |
+| client/src/components/today/CommandBox.tsx | Universal command surface. Live classification preview with 600ms debounce, Cmd/Ctrl+Enter submit, result card with type-specific renderers (briefing → person list, intel → power-move list, owner → contact list, gap → uncovered orgs, watch_added → confirmation, logged → interaction id, pending → "ships next phase"). ~340 lines. |
+| client/src/components/today/DigestCard.tsx | One component, 10 card types via meta map (icon + tone + label). Optimistic dismiss with slide+fade, primary tap-to-action. Light/dark designed. ~210 lines. |
 
 ### Components (`client/src/components/`)
 
@@ -604,6 +618,7 @@ Format: `YYYY-MM-DD — {feat|fix|chore|refactor|docs}({area}): one-line descrip
 
 ### 2026-05-08
 
+- 2026-05-08 — feat(week3): universal command box + Today + Graph IA collapse. **Backend:** `server/services/intent-router.service.ts` classifies utterances into 9 tools (8 intents + unknown) via Claude Haiku 4.5 (~$0.0001/call); defensive JSON parse handles code-fence wrapping. `server/services/command-dispatcher.service.ts` dispatches each tool with graceful error/pending fallbacks (never throws to caller). 8 tools: findPath, briefPerson, logInteraction (extracts capitalized-word person candidates), searchIntel (org → recent power-moves), updateOpportunity (returns `pending` until week 5), addToWatchlist (auto-classifies type as person/organization/sector/role with honest copy), whoOwns (joins ownership + persons + users), coverageGap (sector → uncovered orgs with type mapping). New `server/routers/today.router.ts` (175 lines) exposes feed/dismissCard/actCard/command/classify with audit logging. **Frontend:** `Today.tsx` is the new `/` route — greeting + command box + ranked digest feed with 3 starter prompts in empty state. `Graph.tsx` collapses People/Organizations/Network/Paths into one surface with filter chips (existing pages stay mounted at original routes). `CommandBox.tsx` (340 lines) Apple-grade: live classification preview with 600ms debounce, Cmd/Ctrl+Enter submit, type-specific result renderers, voice mic placeholder for week 4. `DigestCard.tsx` (210 lines) 10 card types via meta map, optimistic dismiss with slide+fade. Sidebar restructured: Today → Graph → Dashboard → People → Organizations → Path Finder → Alerts → Briefings. **Tests:** 13 new vitest cases for intent catalog, empty-input short-circuit (no API call), every dispatcher tool's error path. **Bug-check (Rule 1, with Rule 3 6th lens):** 6 passes, 2 fixes, 3 consecutive clean. Fixes — F1.3: textarea max-h-200px to cap growth on long log entries; F3.1: addToWatchlist heuristic classification (capitalized phrases → "role", lowercase short phrases → "sector") so summary copy stays honest. Verification gates green. (commit pending)
 - 2026-05-08 — feat(week2): ship Week 2 partial — agent runner + institutional skeleton seed + Agent Operations admin UI. **Files:** `server/services/agent-runner.service.ts` (runner with atomic claim, 60s tick, 5-min timeout, manual trigger), `server/services/cron-utils.ts` (in-house IST-aware parser + next-run computer), `server/db/institutional-skeleton.ts` (54 curated Indian financial institutions), `server/services/institutional-skeleton-seed.service.ts` (idempotent seeder), `server/db/seed.ts` (rewritten entrypoint), `server/routers/agents.router.ts` (6 admin procedures), `client/src/pages/admin/AgentOperations.tsx` (Apple-grade UI per Rule 3 — optimistic toggles, designed loading/empty/error states, AlertDialog for destructive actions, AAA-contrast badges in light/dark, 375px responsive). **Wired:** `server/index.ts` boots `syncAgentRegistry()` then starts runner; `server/routers.ts` registers `agents` namespace; `client/src/App.tsx` adds `/admin/agents` route; `DashboardLayout.tsx` adds nav link. **21 new tests** (cron parser correctness, IST next-run accuracy across DST-free year, skeleton dataset shape, agent-definition coverage). **Bug-check (Rule 1):** 10 passes, 4 fixes, 3 consecutive clean. Fixes — F1: drop wasted SQL placeholder in listSchedules + cast json columns at boundary; F3: optimistic UI on enable/dryRun toggle (Rule 3 #6); F6: overflow-x on runs table for 375px; F7: manual runs touch lastRunAt for UI consistency. **Defers to follow-on session:** 2.1 Apify configs for live ingestion, 2.3-2.5 real ingestion/dedup/change-detection dispatchers (need Apify token + cost-controlled live testing), 2.9 dispatcher integration tests. (commit `652c967`)
 - 2026-05-08 — chore(rules): add **Rule 3 — Apple-grade UX** to `CLAUDE.md`. Senior-executive product means zero tolerance for clutter or jank; every UI surface must feel Apple-designed. Codifies HIG triad (clarity / deference / depth), 16 enforceable principles (one job per surface, zero-state-as-teaching, optimistic UI, designed loading states, error-says-what-why-next, undo over confirm, 44pt targets, motion has meaning, accessibility non-negotiable, voice-first, 80% clean over 100% cluttered, etc.), an 8-point UX self-review checklist (light/dark, keyboard-only, slow 3G, 375px, aria-labels, error paths, ear-test, "they cared" test) added as a 6th lens to Rule 1's bug-check for any `client/` change, and a list of refused anti-patterns (multi-line buttons, "Submit" labels, generic "Are you sure?", spinner-only loading, terminology drift). Existing pages grandfathered until touched. Saved as feedback memory for cross-session persistence. Bug-check: 4 passes, 3 fixes (typo, grandfathering clause, design-token reference), 3 consecutive clean. (commit `02e3250`)
 - 2026-05-08 — chore(rules): codify two new workflow rules in `CLAUDE.md`: **Rule 1** — three consecutive clean bug-check passes required before any task is "done" (rotate lens each pass: correctness → schema → edge cases → security → consistency); **Rule 2** — read MAPS.md before starting + update MAPS.md in the same commit as any code change. Saved as feedback memories for cross-session persistence. (commit `b365425`)
