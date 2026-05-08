@@ -59,7 +59,16 @@ export const AUDIT_ACTION_TYPES = ['view', 'create', 'update', 'delete', 'search
 export type AuditActionType = (typeof AUDIT_ACTION_TYPES)[number];
 
 // Audit entity types
-export const AUDIT_ENTITY_TYPES = ['person', 'organization', 'interaction', 'reflection', 'note', 'tenure', 'relationship', 'intel_field', 'user', 'domain', 'external_connection', 'alert', 'briefing', 'chat_conversation', 'apify_source', 'apify_run'] as const;
+// NOTE: any addition here requires an ALTER TABLE on the audit_log.entity_type
+// column to add the new enum value(s). See migration 0005_strategic_spine.sql.
+export const AUDIT_ENTITY_TYPES = [
+  'person', 'organization', 'interaction', 'reflection', 'note', 'tenure',
+  'relationship', 'intel_field', 'user', 'domain', 'external_connection',
+  'alert', 'briefing', 'chat_conversation', 'apify_source', 'apify_run',
+  // Strategic spine (week 1) — must be reflected in audit_log.entity_type DDL
+  'opportunity', 'opportunity_link', 'watch', 'ownership', 'provenance',
+  'power_move', 'digest_card', 'agent_schedule', 'agent_run',
+] as const;
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];
 
 // Alert types
@@ -215,17 +224,5 @@ export type DigestCardType = (typeof DIGEST_CARD_TYPES)[number];
 export const VISIBILITY_SCOPES = ['private', 'team', 'org'] as const;
 export type VisibilityScope = (typeof VISIBILITY_SCOPES)[number];
 
-// Audit entity types — extend the existing list with new entities
-// (used by audit_log when actions affect new entities)
-export const STRATEGIC_AUDIT_ENTITY_TYPES = [
-  'opportunity',
-  'opportunity_link',
-  'watch',
-  'ownership',
-  'provenance',
-  'power_move',
-  'digest_card',
-  'agent_schedule',
-  'agent_run',
-] as const;
-export type StrategicAuditEntityType = (typeof STRATEGIC_AUDIT_ENTITY_TYPES)[number];
+// (STRATEGIC_AUDIT_ENTITY_TYPES was folded into AUDIT_ENTITY_TYPES above —
+// the audit_log table uses one enum; new entities live in the same list.)

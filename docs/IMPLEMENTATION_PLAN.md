@@ -190,8 +190,9 @@ Each week is a coherent shippable chunk. **MAPS.md must be updated in the same c
 ### Week 2 — Apify watchers + Indian institutional skeleton
 **Goal:** auto-ingested live institutional graph; Day-1 activation works.
 
+- [ ] 2.0 Wire `syncAgentRegistry()` into `server/index.ts` boot path (one-line call after DB pool init). Already implemented in week 1 but not yet called at boot.
 - [ ] 2.1 Promote `apify_source_configs` to production: pre-create configs for RBI press releases, PIB, MCA21, SEBI orders, BSE/NSE filings, Gazette of India
-- [ ] 2.2 Agent runner: `server/services/agent-runner.service.ts` reads `agent_schedules`, executes due agents
+- [ ] 2.2 Agent runner: `server/services/agent-runner.service.ts` reads `agent_schedules`, executes due agents. MUST skip cron-based scheduling for `is_event_driven=true` agents (see MAPS issue AGENT-CRON-EVENT). MUST treat default crons as IST (see AGENT-CRON-TZ).
 - [ ] 2.3 Ingestion agent implementation: pulls Apify dataset, normalizes, writes to provenance + creates/updates persons & orgs
 - [ ] 2.4 Dedup agent: fuzzy-match on name + org, auto-merge > 0.9
 - [ ] 2.5 Change-detection agent: diff role changes vs prior snapshot, write `power_moves`

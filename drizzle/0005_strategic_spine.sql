@@ -167,3 +167,15 @@ CREATE TABLE IF NOT EXISTS `digest_cards` (
   INDEX `digest_cards_user_created_idx` (`user_id`, `created_at`),
   INDEX `digest_cards_expires_idx` (`expires_at`)
 );
+
+-- Extend the audit_log entity_type enum to include the new entities so that
+-- mutations on opportunities, ownership, watches, etc. can be audit-logged
+-- per the CLAUDE.md RBAC rule. MySQL requires MODIFY COLUMN with the full
+-- enum value list — both old and new values.
+ALTER TABLE `audit_log` MODIFY COLUMN `entity_type` ENUM(
+  'person','organization','interaction','reflection','note','tenure',
+  'relationship','intel_field','user','domain','external_connection',
+  'alert','briefing','chat_conversation','apify_source','apify_run',
+  'opportunity','opportunity_link','watch','ownership','provenance',
+  'power_move','digest_card','agent_schedule','agent_run'
+) NOT NULL;

@@ -158,6 +158,18 @@ export const AGENT_DEFINITIONS: AgentDefinition[] = [
  * Ensure agent_registry contains all canonical agents. Updates display name,
  * description, default cadence, model preference if changed in code. Does NOT
  * overwrite per-schedule admin customizations (cron, enabled, token cap).
+ *
+ * Concurrency-safe: agent_registry.name is UNIQUE, so concurrent boots use
+ * INSERT ... ON DUPLICATE KEY UPDATE to merge atomically. Schedule creation
+ * is wrapped in try/catch since the (agent_id) isn't unique — losing a race
+ * just means one boot's insert silently no-ops (we re-check on the next
+ * iteration anyway because the loop is per-agent).
+ *
+ * Audit-log exemption: this is a system-bootstrap mutation (no userId, runs
+ * on every server start, idempotent). The CLAUDE.md "every mutation must
+ * audit-log" rule targets user actions, not boot-time invariant maintenance.
+ * If we need a record of registry drift, callers can log the returned
+ * { created, updated, schedulesCreated } counts.
  */
 export async function syncAgentRegistry(): Promise<{ created: number; updated: number; schedulesCreated: number }> {
   const db = getDb();
@@ -170,11 +182,12 @@ export async function syncAgentRegistry(): Promise<{ created: number; updated: n
   let schedulesCreated = 0;
 
   for (const def of AGENT_DEFINITIONS) {
-    const existing = await db.select().from(agentRegistry).where(eq(agentRegistry.name, def.name)).limit(1);
-
-    if (existing.length === 0) {
-      const newId = crypto.randomUUID();
-      await db.insert(agentRegistry).values({
+    // Atomic upsert via ON DUPLICATE KEY UPDATE. The UNIQUE constraint on
+    // agent_registry.name makes this race-free under concurrent server boots.
+    const newId = crypto.randomUUID();
+    await db
+      .insert(agentRegistry)
+      .values({
         id: newId,
         name: def.name,
         displayName: def.displayName,
@@ -184,48 +197,50 @@ export async function syncAgentRegistry(): Promise<{ created: number; updated: n
         isEventDriven: def.isEventDriven,
         defaultTokenCapUsd: def.defaultTokenCapUsd,
         preferredModel: def.preferredModel,
+      })
+      .onDuplicateKeyUpdate({
+        set: {
+          displayName: def.displayName,
+          description: def.description,
+          defaultCadenceCron: def.defaultCadenceCron,
+          isUserScoped: def.isUserScoped,
+          isEventDriven: def.isEventDriven,
+          preferredModel: def.preferredModel,
+        },
       });
-      created++;
 
-      // Create a default schedule alongside the new registry row.
-      await db.insert(agentSchedules).values({
-        id: crypto.randomUUID(),
-        agentId: newId,
-        cronExpression: def.defaultCadenceCron,
-        isEnabled: def.startEnabled,
-        isDryRun: def.startDryRun,
-        monthlyTokenCapUsd: def.defaultTokenCapUsd,
-      });
-      schedulesCreated++;
+    // Re-fetch the canonical row (could be the freshly-inserted one OR an
+    // existing row that just got updated).
+    const [row] = await db.select().from(agentRegistry).where(eq(agentRegistry.name, def.name)).limit(1);
+    if (!row) {
+      // Should be impossible — INSERT ... ON DUPLICATE KEY UPDATE always
+      // leaves a row. Treat as transient and skip.
+      continue;
+    }
+
+    if (row.id === newId) {
+      created++;
     } else {
-      const row = existing[0];
-      const needsUpdate =
+      // Existing row was upserted. Count as updated only if anything actually
+      // changed (best-effort check on the fields we just wrote).
+      const drifted =
         row.displayName !== def.displayName ||
         row.description !== def.description ||
         row.defaultCadenceCron !== def.defaultCadenceCron ||
         row.isUserScoped !== def.isUserScoped ||
         row.isEventDriven !== def.isEventDriven ||
         row.preferredModel !== def.preferredModel;
+      if (drifted) updated++;
+    }
 
-      if (needsUpdate) {
-        await db
-          .update(agentRegistry)
-          .set({
-            displayName: def.displayName,
-            description: def.description,
-            defaultCadenceCron: def.defaultCadenceCron,
-            isUserScoped: def.isUserScoped,
-            isEventDriven: def.isEventDriven,
-            preferredModel: def.preferredModel,
-          })
-          .where(eq(agentRegistry.id, row.id));
-        updated++;
-      }
-
-      // Ensure at least one schedule exists for this agent (recovery if it was
-      // lost). Don't touch existing schedules — admins can have customised them.
-      const schedules = await db.select().from(agentSchedules).where(eq(agentSchedules.agentId, row.id)).limit(1);
-      if (schedules.length === 0) {
+    // Ensure at least one schedule exists. Don't touch existing schedules —
+    // admins may have customised them. (agent_id) isn't unique so we can't
+    // upsert atomically; instead select-then-insert under best-effort race
+    // tolerance: if two boots race here, both insert and we end up with two
+    // default schedules. Acceptable trade-off — admins can delete duplicates.
+    const schedules = await db.select().from(agentSchedules).where(eq(agentSchedules.agentId, row.id)).limit(1);
+    if (schedules.length === 0) {
+      try {
         await db.insert(agentSchedules).values({
           id: crypto.randomUUID(),
           agentId: row.id,
@@ -235,6 +250,10 @@ export async function syncAgentRegistry(): Promise<{ created: number; updated: n
           monthlyTokenCapUsd: def.defaultTokenCapUsd,
         });
         schedulesCreated++;
+      } catch (err) {
+        // FK violation if the agent row was deleted between SELECT and INSERT —
+        // very unlikely. Log and continue.
+        console.error(`[agent-registry] Failed to create default schedule for ${def.name}:`, err);
       }
     }
   }

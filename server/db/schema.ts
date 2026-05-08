@@ -521,6 +521,18 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   apifySourceConfigs: many(apifySourceConfigs),
   apifyRuns: many(apifyRuns),
   bankLeadershipRecords: many(bankLeadershipRecords),
+  // Strategic spine inverse relations (week 1)
+  ownedOpportunities: many(opportunities, { relationName: 'opportunityOwner' }),
+  createdOpportunities: many(opportunities, { relationName: 'opportunityCreator' }),
+  watches: many(watches),
+  ownedRelationships: many(ownership, { relationName: 'ownershipOwner' }),
+  assignedOwnerships: many(ownership, { relationName: 'ownershipAssigner' }),
+  capturedProvenance: many(provenance, { relationName: 'provenanceCapturer' }),
+  verifiedProvenance: many(provenance, { relationName: 'provenanceVerifier' }),
+  digestCards: many(digestCards),
+  agentRunsScoped: many(agentRuns, { relationName: 'agentRunScopeUser' }),
+  agentRunsTriggered: many(agentRuns, { relationName: 'agentRunTriggerUser' }),
+  agentSchedulesUpdated: many(agentSchedules),
 }));
 
 export const domainsRelations = relations(domains, ({ one, many }) => ({
@@ -532,6 +544,8 @@ export const domainsRelations = relations(domains, ({ one, many }) => ({
   childDomains: many(domains, { relationName: 'domainParent' }),
   organizations: many(organizations),
   userAccess: many(userDomainAccess),
+  // Strategic spine inverse relations (week 1)
+  opportunities: many(opportunities),
 }));
 
 export const userDomainAccessRelations = relations(userDomainAccess, ({ one }) => ({
@@ -558,6 +572,11 @@ export const organizationsRelations = relations(organizations, ({ one, many }) =
   apifySourceConfigs: many(apifySourceConfigs),
   apifyRuns: many(apifyRuns),
   bankLeadershipRecords: many(bankLeadershipRecords),
+  // Strategic spine inverse relations (week 1)
+  digestCardsRelated: many(digestCards),
+  powerMovesPrimary: many(powerMoves, { relationName: 'powerMovePrimaryOrg' }),
+  powerMovesFrom: many(powerMoves, { relationName: 'powerMoveFromOrg' }),
+  powerMovesTo: many(powerMoves, { relationName: 'powerMoveToOrg' }),
 }));
 
 export const orgHierarchyRelations = relations(orgHierarchy, ({ one }) => ({
@@ -596,6 +615,10 @@ export const personsRelations = relations(persons, ({ one, many }) => ({
   apifySourceConfigs: many(apifySourceConfigs),
   apifyRuns: many(apifyRuns),
   importedBankLeadershipRecords: many(bankLeadershipRecords),
+  // Strategic spine inverse relations (week 1)
+  ownership: many(ownership),
+  digestCardsRelated: many(digestCards),
+  powerMovesPrimary: many(powerMoves),
 }));
 
 export const tenuresRelations = relations(tenures, ({ one, many }) => ({
@@ -1007,7 +1030,10 @@ export const powerMoves = pgTable('power_moves', {
   toTitle: varchar('to_title', { length: 255 }),
   sourceUrl: text('source_url'),
   sourceType: provenanceSourceTypeEnum('source_type').notNull().default('unknown'),
-  agentRunId: uuid('agent_run_id'),
+  // Forward reference: agentRuns is defined later in this file (migration 0006).
+  // Drizzle's references() callback resolves lazily so forward refs are OK.
+  // The SQL FK is added via ALTER TABLE in migration 0006_agent_registry.sql.
+  agentRunId: uuid('agent_run_id').references((): any => agentRuns.id),
   confidence: real('confidence'),
   isPublished: boolean('is_published').notNull().default(true),
   metadata: jsonb('metadata'),
@@ -1204,6 +1230,10 @@ export const powerMovesRelations = relations(powerMoves, ({ one }) => ({
     fields: [powerMoves.toOrgId],
     references: [organizations.id],
     relationName: 'powerMoveToOrg',
+  }),
+  agentRun: one(agentRuns, {
+    fields: [powerMoves.agentRunId],
+    references: [agentRuns.id],
   }),
 }));
 

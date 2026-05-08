@@ -80,14 +80,39 @@ Leave the repo so that:
 ## Strategic plan
 The full implementation plan lives in `docs/IMPLEMENTATION_PLAN.md`. The 6-week sequence is the canonical roadmap. Do not reorder or descope without updating that file in the same PR.
 
-## MAPS.md — single source of truth (HARD RULE)
-`MAPS.md` at the repo root is the authoritative map of the codebase: every page, router, table, agent, integration, and known issue.
+## Workflow rules (HARD — apply to every task)
 
-**Every commit that adds, changes, or removes code MUST update the relevant section of MAPS.md in the same commit, AND append a Changelog entry at the bottom.**
+### Rule 1 — Three-pass bug check before declaring done
 
-A PR is not done until MAPS reflects reality. If you discover MAPS has drifted from the code, fix MAPS in the same change. Reviewers should reject any code-changing PR that does not touch MAPS.
+After you believe a task is finished, you MUST perform at least three sequential bug-check passes. A "pass" is a deliberate, structured re-read of every file you touched (and adjacent files that consume them) looking for:
 
-This is what keeps RelGraph maintainable as it grows — read MAPS first when picking up work, write to MAPS last when finishing.
+- **Pass focus areas** (rotate emphasis each pass — don't repeat the same lens):
+  1. **Correctness** — wrong logic, off-by-one, inverted conditions, missing null checks, type mismatches the compiler missed (any/unknown), unreachable branches, async/await mistakes, race conditions, wrong column names, FK to wrong table, wrong direction on comparisons, swapped arguments
+  2. **Schema & migration** — column types match across schema.ts and SQL, FK target types correct (int vs varchar(36) for users.id legacy), enum values match between TS enum + Drizzle pgEnum + SQL DDL, indexes on right columns, UNIQUE/NOT NULL where required, ON DELETE behaviour sensible, no orphaned references
+  3. **Edge cases** — empty inputs, single-element collections, null/undefined inputs, very large inputs, unicode/special chars, concurrent writes, retry idempotency, time-zone handling, dates near boundaries, missing optional fields, what happens when DB is unavailable
+  4. **Security & RBAC** — every new procedure has correct authorization tier (publicProcedure / protectedProcedure / contributorProcedure / adminProcedure / domainScopedProcedure), no SQL injection, no auth bypass, no PII leak, audit log written for mutations, secrets not logged, visibility scopes enforced, ownership boundaries respected
+  5. **Consistency** — code matches MAPS.md, MAPS.md matches code, naming conventions followed (camelCase TS, snake_case SQL), file placement matches structure (CLAUDE.md required structure), enums centralized in shared/enums.ts, no duplicated constants
+
+- **Stopping rule:** continue passes until you have **at least three consecutive passes that find zero bugs**. If a pass finds even one bug, fix it and reset the counter — the next pass becomes pass 1 again. Three clean passes in a row = done.
+
+- **Document it:** in the commit message or PR body, state: "Bug-check: N total passes, M findings fixed, 3 consecutive clean passes." If finding & fixing reveals architectural drift, update MAPS.md per Rule 2.
+
+- **What counts as a "bug" worth fixing now vs filing:** anything that breaks correctness, security, or user-visible behaviour → fix now. Style nits, minor refactors, or hypothetical future hardening → file as a TODO or skip.
+
+### Rule 2 — Read MAPS.md before starting; update MAPS.md after every change
+
+**Before any task:**
+1. Read `MAPS.md` cover-to-cover (or at least the sections you'll touch)
+2. Read `docs/IMPLEMENTATION_PLAN.md` for current week's checklist
+3. Read recent `git log --oneline -20` for context
+
+**After any change:**
+- Every commit that adds, changes, or removes code MUST update the relevant section of MAPS.md in the **same commit**
+- Append a Changelog entry at the bottom of MAPS.md with date, type, area, description, and (after push) commit SHA
+- If you discover MAPS has drifted from code reality, fix MAPS as part of the change — never leave it stale
+- A PR is not done until MAPS reflects reality. Reviewers should reject any code-changing PR that does not touch MAPS.
+
+This is what keeps RelGraph maintainable as the codebase grows. Read MAPS first when picking up work; write to MAPS last when finishing.
 
 ## Status tracking
 - Active plan: `docs/IMPLEMENTATION_PLAN.md`

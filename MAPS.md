@@ -173,7 +173,7 @@ Migrations: `drizzle/0005_strategic_spine.sql`, `drizzle/0006_agent_registry.sql
 - `POWER_MOVE_TYPES` — `role_change | board_appointment | board_exit | committee_appointment | company_formation | regulatory_action | major_filing | public_statement | other`
 - `DIGEST_CARD_TYPES` — 10 card types for the Today feed
 - `VISIBILITY_SCOPES` — `private | team | org`
-- `STRATEGIC_AUDIT_ENTITY_TYPES` — extension list for audit_log when actions affect new entities
+- `AUDIT_ENTITY_TYPES` (extended) — added `opportunity`, `opportunity_link`, `watch`, `ownership`, `provenance`, `power_move`, `digest_card`, `agent_schedule`, `agent_run` so that mutations on new entities can be audit-logged. `audit_log.entity_type` MySQL enum modified via `ALTER TABLE` in `0005_strategic_spine.sql`.
 
 ---
 
@@ -564,10 +564,16 @@ Vitest. Roughly 8 test files at present:
 
 | ID | Title | Notes |
 |---|---|---|
-| DB-DIALECT | `.env.example` says Postgres, live is MySQL | Fix env example in week 1; document in CLAUDE.md |
-| LEGACY-USERS | Live users table uses camelCase columns (`openId`, `loginMethod`, etc.); compat layer in `auth.service.ts` | Don't refactor until magic-link replaces password flow |
+| DB-DIALECT | `.env.example` says Postgres, live is MySQL | Fix env example in week 1; documented in CLAUDE.md |
+| LEGACY-USERS | Live users table uses int IDs / camelCase columns; new tables FK users via `int` per migration convention; schema.ts declares `uuid` (compat shim) | Don't refactor until magic-link replaces password flow |
 | EMAIL-API | No email API wired; magic-link blocked | Defer magic-link until ready |
 | CLOUDFLARE-AUTH-WALL | Manus deployments behind Cloudflare turnstile occasionally block authenticated browser tests | Documented in `browser-validation-notes.md` |
+| POLY-ORPHAN | `opportunity_links.target_id` and `watches.target_id` are polymorphic (no FK); rows orphan if target person/org is deleted | Trust-auditor agent (week 6) cleans up dangling rows |
+| AGENT-CRON-EVENT | Event-driven agents (`dedup`, `path_recompute`) carry placeholder cron `* * * * *`; the runner MUST skip cron-based scheduling for any agent where `is_event_driven=true` | Implement in agent-runner service (week 2) |
+| AGENT-CRON-TZ | All default cron expressions are written in IST (e.g., `0 4 * * *` = 04:00 IST). Manus servers may run UTC; the runner must apply IST offset when computing next_run_at | Implement in agent-runner service (week 2) |
+| WATCH-DEDUP | No UNIQUE constraint on `watches(user_id, target_type, target_id)` — sectors/roles have NULL target_id which MySQL UNIQUE doesn't dedupe | App-level dedup in week 2 watches router |
+| OWNERSHIP-CASCADE | `ownership.owner_user_id` ON DELETE CASCADE deletes ownership rows when user deleted, leaving people unowned. Mitigated because users are deactivated (`is_active=false`) not hard-deleted | Document; revisit if hard-delete becomes a flow |
+| AGENT-SCHEDULE-RACE | Concurrent boots could create duplicate default schedules (agent_id isn't unique) | Admin can delete duplicates; runtime sync uses ON DUPLICATE KEY UPDATE for registry to prevent duplicates there |
 
 ### From `qa-notes/` and validation docs
 
@@ -586,5 +592,14 @@ Format: `YYYY-MM-DD — {feat|fix|chore|refactor|docs}({area}): one-line descrip
 
 ### 2026-05-08
 
+- 2026-05-08 — chore(rules): codify two new workflow rules in `CLAUDE.md`: **Rule 1** — three consecutive clean bug-check passes required before any task is "done" (rotate lens each pass: correctness → schema → edge cases → security → consistency); **Rule 2** — read MAPS.md before starting + update MAPS.md in the same commit as any code change. Saved as feedback memories for cross-session persistence. (commit pending)
+- 2026-05-08 — fix(schema): bug-check pass on Week 1 strategic spine. **8 findings fixed across 12 passes** (3 consecutive clean to terminate):
+  1. **Pass 1 (correctness):** Added missing `power_moves.agent_run_id` FK to `agent_runs.id` (forward-ref in schema.ts via `() => agentRuns.id`, ALTER TABLE in 0006 SQL); added inverse Drizzle relations on `usersRelations`, `personsRelations`, `domainsRelations`, `organizationsRelations` so `db.query.x.findFirst({ with: { ... } })` traverses to all 10 new tables.
+  2. **Pass 3 (edge cases):** Made `syncAgentRegistry()` concurrency-safe via `INSERT ... ON DUPLICATE KEY UPDATE` (was vulnerable to race on multi-replica boot).
+  3. **Pass 4 (security/RBAC):** Extended `AUDIT_ENTITY_TYPES` enum + ALTER TABLE on `audit_log.entity_type` to include the 9 new entity types (`opportunity`, `opportunity_link`, `watch`, `ownership`, `provenance`, `power_move`, `digest_card`, `agent_schedule`, `agent_run`) — without this, future routers couldn't audit-log mutations on new entities. Removed redundant `STRATEGIC_AUDIT_ENTITY_TYPES` const.
+  4. **Pass 5 (consistency):** Removed stale MAPS reference to deleted `STRATEGIC_AUDIT_ENTITY_TYPES`.
+  5. **Pass 6 (docs):** Added audit-log exemption rationale to `syncAgentRegistry()`. Added 6 new tracked-issue rows to MAPS section 14 (POLY-ORPHAN, AGENT-CRON-EVENT, AGENT-CRON-TZ, WATCH-DEDUP, OWNERSHIP-CASCADE, AGENT-SCHEDULE-RACE).
+  6. **Pass 9 (planning):** Added 2.0 (wire `syncAgentRegistry()` into boot) to Week 2 checklist.
+  Passes 10/11/12 clean — gates green: `pnpm check`, `pnpm build`, 39 test cases pass (3 unrelated pre-existing failures: DATABASE_URL env, APIFY_API_TOKEN env, scaffold.test layout dir). (commit pending)
 - 2026-05-08 — feat(schema): Week 1 strategic spine ships. Add 10 new tables (opportunities, opportunity_links, watches, ownership, provenance, power_moves, digest_cards, agent_registry, agent_schedules, agent_runs) + 12 new enum sets + 18 new Zod validation schemas + 11 new TypeScript types. Drizzle migrations 0005, 0006 with idempotent seed of 10 canonical agents (ingestion agents start disabled+dry-run as cost guardrail). New `agent-registry.service.ts` provides boot-time registry sync. 21 new vitest cases covering schema exports, stage transitions, validation rules, agent guardrails — all passing. `pnpm check` and `pnpm build` green. (commit `d4047ca`)
 - 2026-05-08 — docs(plan): create IMPLEMENTATION_PLAN.md and MAPS.md with full audit of existing 22 tables, 20 routers, 19 pages, voice + Apify state. Establish MAPS-update rule in CLAUDE.md. (commit `318116c`)

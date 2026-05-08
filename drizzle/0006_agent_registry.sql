@@ -95,6 +95,13 @@ INSERT IGNORE INTO `agent_registry` (`id`, `name`, `display_name`, `description`
   ('00000000-0000-4000-a000-000000000009', 'trust_auditor', 'Trust Auditor', 'Demote confidence on facts past expires_at; flag stale roles.', '0 4 * * 0', FALSE, FALSE, 5.0, 'claude-haiku-4-5-20251001'),
   ('00000000-0000-4000-a000-00000000000a', 'digest', 'Daily Digest', 'For each user, assemble Today action feed cards from watches, owned relationships, opportunities.', '0 6 * * *', TRUE, FALSE, 20.0, 'claude-sonnet-4-6');
 
+-- Now that agent_runs exists, wire the deferred FK from power_moves.agent_run_id
+-- (the column was added in 0005 but the FK had to wait for this migration).
+-- ON DELETE SET NULL — a deleted run shouldn't nuke historical power-moves it generated.
+ALTER TABLE `power_moves`
+  ADD CONSTRAINT `pm_agent_run_fk`
+  FOREIGN KEY (`agent_run_id`) REFERENCES `agent_runs`(`id`) ON DELETE SET NULL;
+
 -- Seed default schedules. Ingestion + change_detection start DISABLED (cost guardrail);
 -- admin enables via Agent Operations UI after reviewing cost projections.
 -- User-facing agents (digest, brief) start ENABLED so users get value out of the box.
