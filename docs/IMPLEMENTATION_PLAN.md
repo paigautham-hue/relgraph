@@ -191,11 +191,11 @@ Each week is a coherent shippable chunk. **MAPS.md must be updated in the same c
 **Goal:** auto-ingested live institutional graph; Day-1 activation works.
 
 - [x] 2.0 Wire `syncAgentRegistry()` into `server/index.ts` boot path. Also starts `startAgentRunner()` after DB pool init.
-- [ ] 2.1 Promote `apify_source_configs` to production: pre-create configs for RBI press releases, PIB, MCA21, SEBI orders, BSE/NSE filings, Gazette of India *(deferred — needs Apify token + cost-controlled live testing)*
+- [x] 2.1 Promoted `apify_source_configs` to production: 7 curated configs targeting `apify/website-content-crawler` for RBI press releases, PIB, MCA21, SEBI orders, BSE+NSE announcements, Gazette of India. All start `is_active=false` per cost guardrail. ✅ SHIPPED 2026-05-08.
 - [x] 2.2 Agent runner: `server/services/agent-runner.service.ts` + `cron-utils.ts`. Atomic claim via UPDATE-WHERE on `next_run_at`. Skips event-driven agents in WHERE clause. IST-aware via in-house cron parser. Singleton tick every 60s. Per-run timeout 5min. Manual `triggerRunNow()` for admin UI.
-- [ ] 2.3 Ingestion agent dispatcher (RBI/PIB, MCA21/Gazette, BSE/NSE): pulls Apify dataset, normalizes, writes to provenance + creates/updates persons & orgs *(deferred to next session — depends on 2.1)*
-- [ ] 2.4 Dedup agent dispatcher: fuzzy-match on name + org, auto-merge > 0.9 *(deferred to next session)*
-- [ ] 2.5 Change-detection agent dispatcher: diff role changes vs prior snapshot, write `power_moves` *(deferred to next session)*
+- [x] 2.3 Ingestion dispatchers: factory `makeIngestionDispatcher(seedNames)` returns 3 pre-bound (rbiPib, mca21Gazette, bseNse). Per source: pre-flight `is_active`, spawn apify_runs row, call actor, dedup via content_hash, write provenance to canonical source org. Dry-run caps `maxCrawlPages=1`. ✅ SHIPPED 2026-05-08.
+- [x] 2.4 Dedup dispatcher: pure Jaccard scoring (0.5 name + 0.2 title + 0.3 same-org). Auto-merge gated behind `configOverrides.autoMerge=true`. Returns review pairs. ✅ SHIPPED 2026-05-08.
+- [x] 2.5 Change-detection dispatcher: heuristic rules emit role_change/board_appointment from new tenures, regulatory_action from provenance keyword matches. Dedup ±48h window. ✅ SHIPPED 2026-05-08.
 - [x] 2.6 Seed script: `server/db/institutional-skeleton.ts` (data) + `server/services/institutional-skeleton-seed.service.ts` (idempotent seeder) + `server/db/seed.ts` (entrypoint). 54 curated organizations: 12 PSBs, 20 private banks, 5 regulators, 5 govt bodies, 7 DFIs, 5 market infra. Run via `pnpm db:seed`.
 - [x] 2.7 Admin UI: `client/src/pages/admin/AgentOperations.tsx` — Apple-grade per Rule 3. Schedule cards with optimistic toggles, inline cron+cap edit, dry-run mode, run-now/dry-run buttons, monthly usage progress bar with semantic colors, AlertDialog for destructive reset, recent runs table with status badges and error tooltips. Designed loading/empty states. 375px responsive.
 - [x] 2.8 MAPS.md updated with agent runner, cron utils, skeleton seed, agents router, AgentOperations page.

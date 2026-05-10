@@ -172,6 +172,9 @@ export const provenanceRouter = router({
  * Helper for in-process callers (other routers) that need to record
  * provenance as part of their own write transaction. Returns the new id;
  * never throws — provenance is best-effort.
+ *
+ * `capturedBy` accepts null for system-driven writes (e.g. ingestion agents)
+ * — the column itself is nullable.
  */
 export async function recordProvenance(params: {
   entityType: typeof createProvenanceSchema._input.entityType;
@@ -181,7 +184,7 @@ export async function recordProvenance(params: {
   sourceUrl?: string;
   sourceLabel?: string;
   contentHash?: string;
-  capturedBy: string;
+  capturedBy: string | null;
   confidence?: number;
   expiresAt?: Date;
   metadata?: Record<string, unknown>;

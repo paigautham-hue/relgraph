@@ -11,6 +11,14 @@ import { syncAgentRegistry } from "./services/agent-registry.service";
 import { startAgentRunner, registerAgentDispatcher } from "./services/agent-runner.service";
 import { digestDispatcher } from "./services/agents/digest-dispatcher";
 import { trustAuditorDispatcher } from "./services/agents/trust-auditor-dispatcher";
+import {
+  rbiPibIngestionDispatcher,
+  mca21GazetteIngestionDispatcher,
+  bseNseIngestionDispatcher,
+} from "./services/agents/ingestion-dispatcher";
+import { dedupDispatcher } from "./services/agents/dedup-dispatcher";
+import { changeDetectionDispatcher } from "./services/agents/change-detection-dispatcher";
+import { syncApifySourceSeeds } from "./services/apify-source-seeds";
 
 async function startServer() {
   const app = express();
@@ -58,11 +66,34 @@ async function startServer() {
     console.error("[boot] Agent registry sync failed (continuing boot):", err);
   }
 
-  // Register real dispatchers shipped in week 6. Other dispatchers
-  // (ingestion_*, change_detection, dedup, enrichment, path_recompute,
-  // brief) remain no-op until their respective implementations land.
+  // Boot-time sync of Apify source configs for the 7 Indian institutional
+  // feeds. Idempotent — admin customisations of cron/defaultInput/watchFields
+  // are preserved on re-sync. Sources start is_active=false; admin enables
+  // each from Apify Ops after reviewing target URLs and estimated cost.
+  try {
+    const apifyResult = await syncApifySourceSeeds();
+    if (apifyResult.created || apifyResult.updated) {
+      console.log(
+        `[boot] Apify source seeds: ${apifyResult.created} created, ${apifyResult.updated} updated, ${apifyResult.skipped} unchanged`,
+      );
+    }
+  } catch (err) {
+    console.error("[boot] Apify source seeds sync failed (continuing boot):", err);
+  }
+
+  // Register all real dispatchers. Each agent's run lifecycle is recorded
+  // in agent_runs and surfaced in Agent Operations admin UI.
   registerAgentDispatcher("digest", digestDispatcher);
   registerAgentDispatcher("trust_auditor", trustAuditorDispatcher);
+  // Ingestion (week 2.3) — three buckets aligned to the agent_registry seeds.
+  registerAgentDispatcher("ingestion_rbi_pib", rbiPibIngestionDispatcher);
+  registerAgentDispatcher("ingestion_mca21_gazette", mca21GazetteIngestionDispatcher);
+  registerAgentDispatcher("ingestion_bse_nse", bseNseIngestionDispatcher);
+  // Dedup (week 2.4) — event-driven; runner skips cron-based scheduling but
+  // the dispatcher runs when something else (ingestion) triggers it.
+  registerAgentDispatcher("dedup", dedupDispatcher);
+  // Change detection (week 2.5) — daily diff to emit power_moves.
+  registerAgentDispatcher("change_detection", changeDetectionDispatcher);
 
   // Start the agent runner tick. Wakes every minute, finds due schedules,
   // dispatches them. See server/services/agent-runner.service.ts.
