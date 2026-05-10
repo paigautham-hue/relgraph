@@ -14,6 +14,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { CommandBox } from "@/components/today/CommandBox";
 import { DigestCard } from "@/components/today/DigestCard";
+import { VoiceBot } from "@/components/voice/VoiceBot";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -94,6 +95,9 @@ export default function TodayPage() {
           </div>
         )}
       </section>
+
+      {/* Voice bot floats above the page; absent until the user taps. */}
+      <VoiceBot />
     </div>
   );
 }

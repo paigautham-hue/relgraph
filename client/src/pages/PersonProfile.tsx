@@ -3,6 +3,7 @@ import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { AvatarInitials } from "@/components/common/AvatarInitials";
 import { DomainBadge } from "@/components/common/DomainBadge";
+import { ProvenanceChip } from "@/components/provenance/ProvenanceChip";
 import { StrengthMeter } from "@/components/common/StrengthMeter";
 import { InputMethodBadge } from "@/components/common/InputMethodBadge";
 import { FieldHistoryDialog } from "@/components/intel/FieldHistoryDialog";
@@ -771,7 +772,10 @@ export default function PersonProfile() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <AvatarInitials name={fullName} size="xl" />
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{fullName}</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-2xl font-semibold tracking-tight">{fullName}</h1>
+            <ProvenanceChip entityType="person" entityId={person.id} />
+          </div>
           {person.title && (
             <p className="text-muted-foreground">{person.title}</p>
           )}

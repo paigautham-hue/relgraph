@@ -18,6 +18,8 @@ import {
 } from "./services/agents/ingestion-dispatcher";
 import { dedupDispatcher } from "./services/agents/dedup-dispatcher";
 import { changeDetectionDispatcher } from "./services/agents/change-detection-dispatcher";
+import { pathRecomputeDispatcher } from "./services/agents/path-recompute-dispatcher";
+import { enrichmentDispatcher } from "./services/agents/enrichment-dispatcher";
 import { syncApifySourceSeeds } from "./services/apify-source-seeds";
 
 async function startServer() {
@@ -94,6 +96,10 @@ async function startServer() {
   registerAgentDispatcher("dedup", dedupDispatcher);
   // Change detection (week 2.5) — daily diff to emit power_moves.
   registerAgentDispatcher("change_detection", changeDetectionDispatcher);
+  // Path-recompute (event-driven on graph mutations) — emits new_path cards.
+  registerAgentDispatcher("path_recompute", pathRecomputeDispatcher);
+  // Enrichment (weekly) — heuristic backfill of partial records.
+  registerAgentDispatcher("enrichment", enrichmentDispatcher);
 
   // Start the agent runner tick. Wakes every minute, finds due schedules,
   // dispatches them. See server/services/agent-runner.service.ts.

@@ -40,14 +40,39 @@ export class GeminiLiveEngine {
   private destroyed = false;
   private systemPrompt: string;
 
+  /**
+   * Optional custom tool declarations. When provided, replaces the default
+   * chat-panel tools (search_person / get_relationships / etc.) with the
+   * caller's own. Used by VoiceBot to inject the 8 RelGraph intent tools
+   * without disrupting the existing ChatPanel.
+   */
+  private customTools: Array<{ name: string; description: string; parameters: any }> | null = null;
+
+  /**
+   * Optional custom tool handler. When provided, replaces the default
+   * `/api/trpc/chat.executeToolCall` round-trip with the caller's resolver.
+   * Used by VoiceBot to dispatch through `today.executeVoiceIntent`.
+   * The handler receives (name, args) and must return a JSON-serialisable
+   * response that gets fed back to Gemini's functionResponses.
+   */
+  private customToolHandler: ((name: string, args: Record<string, any>) => Promise<unknown>) | null = null;
+
   constructor(
     token: string,
     callbacks: GeminiLiveCallbacks,
     systemPrompt: string,
+    customTools?: Array<{ name: string; description: string; parameters: any }>,
+    customToolHandler?: (name: string, args: Record<string, any>) => Promise<unknown>,
   ) {
     this.token = token;
     this.callbacks = callbacks;
     this.systemPrompt = systemPrompt;
+    if (customTools && customTools.length > 0) {
+      this.customTools = customTools;
+    }
+    if (customToolHandler) {
+      this.customToolHandler = customToolHandler;
+    }
   }
 
   // ── Public API ──────────────────────────────────────────────────────────
@@ -160,6 +185,7 @@ export class GeminiLiveEngine {
   }
 
   private getToolDeclarations() {
+    if (this.customTools) return this.customTools;
     return [
       {
         name: 'search_person',
@@ -320,16 +346,21 @@ export class GeminiLiveEngine {
     args: Record<string, any>;
   }) {
     try {
-      const response = await fetch('/api/trpc/chat.executeToolCall', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          json: { toolName: fc.name, args: fc.args },
-        }),
-      });
-      const body = await response.json();
-      const result = body?.result?.data ?? body;
+      let result: unknown;
+      if (this.customToolHandler) {
+        result = await this.customToolHandler(fc.name, fc.args);
+      } else {
+        const response = await fetch('/api/trpc/chat.executeToolCall', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            json: { toolName: fc.name, args: fc.args },
+          }),
+        });
+        const body = await response.json();
+        result = body?.result?.data ?? body;
+      }
 
       // Send tool response back to Gemini
       if (this.ws?.readyState === WebSocket.OPEN) {

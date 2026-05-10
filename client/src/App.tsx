@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import TodayPage from "./pages/Today";
 import GraphPage from "./pages/Graph";
 import OpportunitiesPage from "./pages/Opportunities";
+import WatchesPage from "./pages/Watches";
 import PersonList from "./pages/PersonList";
 import PersonProfile from "./pages/PersonProfile";
 import UserManagement from "./pages/admin/UserManagement";
@@ -37,6 +38,7 @@ function AppRoutes() {
         <Route path="/today" component={TodayPage} />
         <Route path="/graph" component={GraphPage} />
         <Route path="/opportunities" component={OpportunitiesPage} />
+        <Route path="/watches" component={WatchesPage} />
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/persons" component={PersonList} />
         <Route path="/persons/import-history" component={PersonImportHistory} />

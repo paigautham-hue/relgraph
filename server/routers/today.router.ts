@@ -178,4 +178,56 @@ export const todayRouter = router({
     .query(async ({ input }) => {
       return await classifyIntent(input.utterance);
     }),
+
+  /**
+   * Execute a pre-classified voice intent. Used by the VoiceBot
+   * (Gemini Live) which receives structured function-calls from Gemini's
+   * own classifier — no need to re-run Claude Haiku.
+   *
+   * Returns the same `CommandResult` shape as `command()`, plus a short
+   * `voiceSummary` field intended to be spoken back to the user (TTS-friendly,
+   * <= 200 chars, conversational tone).
+   */
+  executeVoiceIntent: protectedProcedure
+    .input(
+      z.object({
+        tool: z.enum([
+          "findPath",
+          "briefPerson",
+          "logInteraction",
+          "searchIntel",
+          "updateOpportunity",
+          "addToWatchlist",
+          "whoOwns",
+          "coverageGap",
+        ]),
+        args: z.record(z.string(), z.string().or(z.number()).or(z.boolean())).default({}),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      // Coerce all arg values to strings (Gemini may send mixed types).
+      const argsAsStrings: Record<string, string> = {};
+      for (const [k, v] of Object.entries(input.args)) {
+        argsAsStrings[k] = String(v);
+      }
+      const result = await dispatchIntent(
+        { tool: input.tool, args: argsAsStrings, confidence: 1.0 },
+        { userId: ctx.user.id, userName: ctx.user.name },
+      );
+      // Voice-friendly summary: keep it under 200 chars, no markdown.
+      const voiceSummary = result.summary
+        .replace(/\*\*([^*]+)\*\*/g, "$1")
+        .replace(/`([^`]+)`/g, "$1")
+        .replace(/\n+/g, " ")
+        .slice(0, 200);
+      await logAudit({
+        userId: ctx.user.id,
+        actionType: "voice_query",
+        entityType: "user",
+        entityId: ctx.user.id,
+        rawInputText: `[voice] ${input.tool}`,
+        metadata: { tool: input.tool, args: input.args, resultKind: result.kind },
+      });
+      return { result, voiceSummary };
+    }),
 });
