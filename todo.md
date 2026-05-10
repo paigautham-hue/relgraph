@@ -81,3 +81,4 @@
 - [ ] Populate the Indian bank leadership validation queue with source-backed ingestion so reviewed records can move beyond seeded organizations
 - [ ] Re-check related admin data flows for any remaining regressions uncovered while closing the above gaps
 - [x] Normalize the Indian Bank Dataset segment labels so the registry consistently shows Public sector and Private sector instead of legacy bank-type labels
+- [ ] Sync the latest changes from the connected GitHub repository into the RelGraph project and verify whether any conflicts or follow-up fixes are needed
