@@ -1,0 +1,2149 @@
+{
+  "baseUrl": "https://5000-i7zs9ijy9dpiq0wx6acsg-f2432de1.sg1.manus.computer",
+  "checks": {
+    "login": {
+      "status": 200,
+      "user": {
+        "id": "30001",
+        "email": "gautham@manipalgroup.info",
+        "name": "Gauthaam",
+        "role": "super_admin",
+        "avatarUrl": null
+      }
+    },
+    "authMe": {
+      "status": 200,
+      "data": {
+        "id": "30001",
+        "email": "gautham@manipalgroup.info",
+        "name": "Gauthaam",
+        "role": "super_admin",
+        "avatarUrl": null
+      }
+    },
+    "agentSchedules": {
+      "status": 200,
+      "data": [
+        {
+          "id": "00000000-0000-4000-b000-000000000004",
+          "agentId": "00000000-0000-4000-a000-000000000004",
+          "agentName": "change_detection",
+          "agentDisplayName": "Change Detection",
+          "agentDescription": "Diff prior 24h of ingested data, emit power_moves for role/board changes.",
+          "isUserScoped": false,
+          "isEventDriven": false,
+          "preferredModel": "claude-sonnet-4-6",
+          "cronExpression": "0 4 * * *",
+          "isEnabled": false,
+          "isDryRun": false,
+          "monthlyTokenCapUsd": 20,
+          "monthlyTokensUsedUsd": 0,
+          "monthlyWindowStart": "2026-05-10T12:02:51.000Z",
+          "sourceAllowlist": null,
+          "lastRunAt": null,
+          "nextRunAt": null,
+          "configOverrides": null,
+          "cronDescription": "daily at 04:00 IST"
+        },
+        {
+          "id": "00000000-0000-4000-b000-00000000000a",
+          "agentId": "00000000-0000-4000-a000-00000000000a",
+          "agentName": "digest",
+          "agentDisplayName": "Daily Digest",
+          "agentDescription": "For each user, assemble Today action feed cards from watches, owned relationships, opportunities.",
+          "isUserScoped": true,
+          "isEventDriven": false,
+          "preferredModel": "claude-sonnet-4-6",
+          "cronExpression": "0 6 * * *",
+          "isEnabled": true,
+          "isDryRun": false,
+          "monthlyTokenCapUsd": 20,
+          "monthlyTokensUsedUsd": 0,
+          "monthlyWindowStart": "2026-05-10T12:02:51.000Z",
+          "sourceAllowlist": null,
+          "lastRunAt": "2026-05-10T12:03:15.000Z",
+          "nextRunAt": "2026-05-11T00:30:00.000Z",
+          "configOverrides": null,
+          "cronDescription": "daily at 06:00 IST"
+        },
+        {
+          "id": "00000000-0000-4000-b000-000000000005",
+          "agentId": "00000000-0000-4000-a000-000000000005",
+          "agentName": "dedup",
+          "agentDisplayName": "Deduplication",
+          "agentDescription": "Fuzzy-match new entities against existing graph. Auto-merge on >0.9 confidence.",
+          "isUserScoped": false,
+          "isEventDriven": true,
+          "preferredModel": "claude-haiku-4-5-20251001",
+          "cronExpression": "* * * * *",
+          "isEnabled": true,
+          "isDryRun": false,
+          "monthlyTokenCapUsd": 10,
+          "monthlyTokensUsedUsd": 0,
+          "monthlyWindowStart": "2026-05-10T12:02:51.000Z",
+          "sourceAllowlist": null,
+          "lastRunAt": null,
+          "nextRunAt": null,
+          "configOverrides": null,
+          "cronDescription": "every minute (event-driven placeholder)"
+        },
+        {
+          "id": "00000000-0000-4000-b000-000000000006",
+          "agentId": "00000000-0000-4000-a000-000000000006",
+          "agentName": "enrichment",
+          "agentDisplayName": "Enrichment",
+          "agentDescription": "Backfill missing fields (titles, photos, source URLs) on partial records.",
+          "isUserScoped": false,
+          "isEventDriven": false,
+          "preferredModel": "claude-haiku-4-5-20251001",
+          "cronExpression": "0 3 * * 0",
+          "isEnabled": false,
+          "isDryRun": false,
+          "monthlyTokenCapUsd": 15,
+          "monthlyTokensUsedUsd": 0,
+          "monthlyWindowStart": "2026-05-10T12:02:51.000Z",
+          "sourceAllowlist": null,
+          "lastRunAt": null,
+          "nextRunAt": null,
+          "configOverrides": null,
+          "cronDescription": "weekly on Sun at 03:00 IST"
+        },
+        {
+          "id": "00000000-0000-4000-b000-000000000003",
+          "agentId": "00000000-0000-4000-a000-000000000003",
+          "agentName": "ingestion_bse_nse",
+          "agentDisplayName": "Ingestion — BSE / NSE Filings",
+          "agentDescription": "Post-market disclosure pull from BSE and NSE.",
+          "isUserScoped": false,
+          "isEventDriven": false,
+          "preferredModel": "claude-haiku-4-5-20251001",
+          "cronExpression": "0 20 * * *",
+          "isEnabled": false,
+          "isDryRun": true,
+          "monthlyTokenCapUsd": 40,
+          "monthlyTokensUsedUsd": 0,
+          "monthlyWindowStart": "2026-05-10T12:02:51.000Z",
+          "sourceAllowlist": null,
+          "lastRunAt": null,
+          "nextRunAt": null,
+          "configOverrides": null,
+          "cronDescription": "daily at 20:00 IST"
+        },
+        {
+          "id": "00000000-0000-4000-b000-000000000002",
+          "agentId": "00000000-0000-4000-a000-000000000002",
+          "agentName": "ingestion_mca21_gazette",
+          "agentDisplayName": "Ingestion — MCA21 / Gazette",
+          "agentDescription": "Pull MCA21 corporate filings and Gazette of India notifications. Slow-moving batch.",
+          "isUserScoped": false,
+          "isEventDriven": false,
+          "preferredModel": "claude-haiku-4-5-20251001",
+          "cronExpression": "0 2 * * *",
+          "isEnabled": false,
+          "isDryRun": true,
+          "monthlyTokenCapUsd": 30,
+          "monthlyTokensUsedUsd": 0,
+          "monthlyWindowStart": "2026-05-10T12:02:51.000Z",
+          "sourceAllowlist": null,
+          "lastRunAt": null,
+          "nextRunAt": null,
+          "configOverrides": null,
+          "cronDescription": "daily at 02:00 IST"
+        },
+        {
+          "id": "00000000-0000-4000-b000-000000000001",
+          "agentId": "00000000-0000-4000-a000-000000000001",
+          "agentName": "ingestion_rbi_pib",
+          "agentDisplayName": "Ingestion — RBI / PIB",
+          "agentDescription": "Pull RBI press releases and PIB notifications. High-signal regulator feeds.",
+          "isUserScoped": false,
+          "isEventDriven": false,
+          "preferredModel": "claude-haiku-4-5-20251001",
+          "cronExpression": "0 */6 * * *",
+          "isEnabled": false,
+          "isDryRun": true,
+          "monthlyTokenCapUsd": 50,
+          "monthlyTokensUsedUsd": 0,
+          "monthlyWindowStart": "2026-05-10T12:02:51.000Z",
+          "sourceAllowlist": null,
+          "lastRunAt": null,
+          "nextRunAt": null,
+          "configOverrides": null,
+          "cronDescription": "every 6 hours, on the hour (IST)"
+        },
+        {
+          "id": "00000000-0000-4000-b000-000000000007",
+          "agentId": "00000000-0000-4000-a000-000000000007",
+          "agentName": "path_recompute",
+          "agentDisplayName": "Path Recompute",
+          "agentDescription": "Re-run cached pathfinder results for opportunities affected by a moved node.",
+          "isUserScoped": false,
+          "isEventDriven": true,
+          "preferredModel": null,
+          "cronExpression": "* * * * *",
+          "isEnabled": true,
+          "isDryRun": false,
+          "monthlyTokenCapUsd": 5,
+          "monthlyTokensUsedUsd": 0,
+          "monthlyWindowStart": "2026-05-10T12:02:51.000Z",
+          "sourceAllowlist": null,
+          "lastRunAt": null,
+          "nextRunAt": null,
+          "configOverrides": null,
+          "cronDescription": "every minute (event-driven placeholder)"
+        },
+        {
+          "id": "00000000-0000-4000-b000-000000000008",
+          "agentId": "00000000-0000-4000-a000-000000000008",
+          "agentName": "brief",
+          "agentDisplayName": "Pre-Meeting Brief",
+          "agentDescription": "For each user, pre-build briefings for tomorrow's calendar meetings.",
+          "isUserScoped": true,
+          "isEventDriven": false,
+          "preferredModel": "claude-sonnet-4-6",
+          "cronExpression": "0 5 * * *",
+          "isEnabled": true,
+          "isDryRun": false,
+          "monthlyTokenCapUsd": 25,
+          "monthlyTokensUsedUsd": 0,
+          "monthlyWindowStart": "2026-05-10T12:02:51.000Z",
+          "sourceAllowlist": null,
+          "lastRunAt": "2026-05-10T12:03:12.000Z",
+          "nextRunAt": "2026-05-10T23:30:00.000Z",
+          "configOverrides": null,
+          "cronDescription": "daily at 05:00 IST"
+        },
+        {
+          "id": "00000000-0000-4000-b000-000000000009",
+          "agentId": "00000000-0000-4000-a000-000000000009",
+          "agentName": "trust_auditor",
+          "agentDisplayName": "Trust Auditor",
+          "agentDescription": "Demote confidence on facts past expires_at; flag stale roles.",
+          "isUserScoped": false,
+          "isEventDriven": false,
+          "preferredModel": "claude-haiku-4-5-20251001",
+          "cronExpression": "0 4 * * 0",
+          "isEnabled": true,
+          "isDryRun": false,
+          "monthlyTokenCapUsd": 5,
+          "monthlyTokensUsedUsd": 0,
+          "monthlyWindowStart": "2026-05-10T12:02:51.000Z",
+          "sourceAllowlist": null,
+          "lastRunAt": "2026-05-10T12:03:14.000Z",
+          "nextRunAt": "2026-05-16T22:30:00.000Z",
+          "configOverrides": null,
+          "cronDescription": "weekly on Sun at 04:00 IST"
+        }
+      ]
+    },
+    "agentRegistry": {
+      "status": 200,
+      "data": [
+        {
+          "id": "00000000-0000-4000-a000-000000000004",
+          "name": "change_detection",
+          "displayName": "Change Detection",
+          "description": "Diff prior 24h of ingested data, emit power_moves for role/board changes.",
+          "version": "1.0.0",
+          "isEnabled": true,
+          "defaultCadenceCron": "0 4 * * *",
+          "isUserScoped": false,
+          "isEventDriven": false,
+          "defaultTokenCapUsd": 20,
+          "preferredModel": "claude-sonnet-4-6"
+        },
+        {
+          "id": "00000000-0000-4000-a000-00000000000a",
+          "name": "digest",
+          "displayName": "Daily Digest",
+          "description": "For each user, assemble Today action feed cards from watches, owned relationships, opportunities.",
+          "version": "1.0.0",
+          "isEnabled": true,
+          "defaultCadenceCron": "0 6 * * *",
+          "isUserScoped": true,
+          "isEventDriven": false,
+          "defaultTokenCapUsd": 20,
+          "preferredModel": "claude-sonnet-4-6"
+        },
+        {
+          "id": "00000000-0000-4000-a000-000000000005",
+          "name": "dedup",
+          "displayName": "Deduplication",
+          "description": "Fuzzy-match new entities against existing graph. Auto-merge on >0.9 confidence.",
+          "version": "1.0.0",
+          "isEnabled": true,
+          "defaultCadenceCron": "* * * * *",
+          "isUserScoped": false,
+          "isEventDriven": true,
+          "defaultTokenCapUsd": 10,
+          "preferredModel": "claude-haiku-4-5-20251001"
+        },
+        {
+          "id": "00000000-0000-4000-a000-000000000006",
+          "name": "enrichment",
+          "displayName": "Enrichment",
+          "description": "Backfill missing fields (titles, photos, source URLs) on partial records.",
+          "version": "1.0.0",
+          "isEnabled": true,
+          "defaultCadenceCron": "0 3 * * 0",
+          "isUserScoped": false,
+          "isEventDriven": false,
+          "defaultTokenCapUsd": 15,
+          "preferredModel": "claude-haiku-4-5-20251001"
+        },
+        {
+          "id": "00000000-0000-4000-a000-000000000003",
+          "name": "ingestion_bse_nse",
+          "displayName": "Ingestion — BSE / NSE Filings",
+          "description": "Post-market disclosure pull from BSE and NSE.",
+          "version": "1.0.0",
+          "isEnabled": true,
+          "defaultCadenceCron": "0 20 * * *",
+          "isUserScoped": false,
+          "isEventDriven": false,
+          "defaultTokenCapUsd": 40,
+          "preferredModel": "claude-haiku-4-5-20251001"
+        },
+        {
+          "id": "00000000-0000-4000-a000-000000000002",
+          "name": "ingestion_mca21_gazette",
+          "displayName": "Ingestion — MCA21 / Gazette",
+          "description": "Pull MCA21 corporate filings and Gazette of India notifications. Slow-moving batch.",
+          "version": "1.0.0",
+          "isEnabled": true,
+          "defaultCadenceCron": "0 2 * * *",
+          "isUserScoped": false,
+          "isEventDriven": false,
+          "defaultTokenCapUsd": 30,
+          "preferredModel": "claude-haiku-4-5-20251001"
+        },
+        {
+          "id": "00000000-0000-4000-a000-000000000001",
+          "name": "ingestion_rbi_pib",
+          "displayName": "Ingestion — RBI / PIB",
+          "description": "Pull RBI press releases and PIB notifications. High-signal regulator feeds.",
+          "version": "1.0.0",
+          "isEnabled": true,
+          "defaultCadenceCron": "0 */6 * * *",
+          "isUserScoped": false,
+          "isEventDriven": false,
+          "defaultTokenCapUsd": 50,
+          "preferredModel": "claude-haiku-4-5-20251001"
+        },
+        {
+          "id": "00000000-0000-4000-a000-000000000007",
+          "name": "path_recompute",
+          "displayName": "Path Recompute",
+          "description": "Re-run cached pathfinder results for opportunities affected by a moved node.",
+          "version": "1.0.0",
+          "isEnabled": true,
+          "defaultCadenceCron": "* * * * *",
+          "isUserScoped": false,
+          "isEventDriven": true,
+          "defaultTokenCapUsd": 5,
+          "preferredModel": null
+        },
+        {
+          "id": "00000000-0000-4000-a000-000000000008",
+          "name": "brief",
+          "displayName": "Pre-Meeting Brief",
+          "description": "For each user, pre-build briefings for tomorrow's calendar meetings.",
+          "version": "1.0.0",
+          "isEnabled": true,
+          "defaultCadenceCron": "0 5 * * *",
+          "isUserScoped": true,
+          "isEventDriven": false,
+          "defaultTokenCapUsd": 25,
+          "preferredModel": "claude-sonnet-4-6"
+        },
+        {
+          "id": "00000000-0000-4000-a000-000000000009",
+          "name": "trust_auditor",
+          "displayName": "Trust Auditor",
+          "description": "Demote confidence on facts past expires_at; flag stale roles.",
+          "version": "1.0.0",
+          "isEnabled": true,
+          "defaultCadenceCron": "0 4 * * 0",
+          "isUserScoped": false,
+          "isEventDriven": false,
+          "defaultTokenCapUsd": 5,
+          "preferredModel": "claude-haiku-4-5-20251001"
+        }
+      ]
+    },
+    "apifySources": {
+      "status": 200,
+      "data": {
+        "data": [
+          {
+            "id": "c3e974d5-9b77-4b49-a980-e209fc43c879",
+            "name": "gazette_of_india",
+            "description": "Gazette of India — official notifications. Final source of truth for senior government appointments and statutory changes.",
+            "capability": "monitoring",
+            "targetType": "release",
+            "actorId": "apify/website-content-crawler",
+            "actorTaskId": null,
+            "defaultInput": {
+              "crawlerType": "playwright:adaptive",
+              "excludeUrlGlobs": [
+                "https://egazette.gov.in/**/Archive*"
+              ],
+              "htmlTransformer": "readableTextIfPossible",
+              "includeUrlGlobs": [
+                "https://egazette.gov.in/**"
+              ],
+              "maxCrawlDepth": 2,
+              "maxCrawlPages": 100,
+              "proxyConfiguration": {
+                "useApifyProxy": true
+              },
+              "saveContentTypes": "application/pdf",
+              "saveMarkdown": true,
+              "startUrls": [
+                {
+                  "url": "https://egazette.gov.in/(S(WeeklyGazette))/Default.aspx"
+                }
+              ]
+            },
+            "fieldMappings": {},
+            "watchFields": [
+              "notificationTitle",
+              "ministry",
+              "publishedDate"
+            ],
+            "runFrequencyCron": "0 2 * * *",
+            "targetOrganizationId": null,
+            "targetPersonId": null,
+            "createdBy": null,
+            "isActive": false,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-05-10T12:05:03.000Z",
+            "updatedAt": "2026-05-10T12:05:03.000Z"
+          },
+          {
+            "id": "fa435176-be36-4dde-aba8-13345e932f6f",
+            "name": "nse_announcements",
+            "description": "NSE — corporate announcements. Same shape as BSE; both sources confirm major events independently.",
+            "capability": "monitoring",
+            "targetType": "filing",
+            "actorId": "apify/website-content-crawler",
+            "actorTaskId": null,
+            "defaultInput": {
+              "crawlerType": "playwright:adaptive",
+              "htmlTransformer": "readableTextIfPossible",
+              "includeUrlGlobs": [
+                "https://www.nseindia.com/companies-listing/**"
+              ],
+              "maxCrawlDepth": 2,
+              "maxCrawlPages": 150,
+              "proxyConfiguration": {
+                "useApifyProxy": true
+              },
+              "saveMarkdown": true,
+              "startUrls": [
+                {
+                  "url": "https://www.nseindia.com/companies-listing/corporate-filings-announcements"
+                }
+              ]
+            },
+            "fieldMappings": {},
+            "watchFields": [
+              "announcementType",
+              "company",
+              "date"
+            ],
+            "runFrequencyCron": "0 20 * * *",
+            "targetOrganizationId": null,
+            "targetPersonId": null,
+            "createdBy": null,
+            "isActive": false,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-05-10T12:05:03.000Z",
+            "updatedAt": "2026-05-10T12:05:03.000Z"
+          },
+          {
+            "id": "503e5f13-84eb-4435-ab3f-a7ce416fe232",
+            "name": "bse_announcements",
+            "description": "BSE — corporate announcements. Board meeting outcomes, KMP changes, results, postal ballot notices.",
+            "capability": "monitoring",
+            "targetType": "filing",
+            "actorId": "apify/website-content-crawler",
+            "actorTaskId": null,
+            "defaultInput": {
+              "crawlerType": "playwright:adaptive",
+              "excludeUrlGlobs": [
+                "https://www.bseindia.com/**/Old/**"
+              ],
+              "htmlTransformer": "readableTextIfPossible",
+              "includeUrlGlobs": [
+                "https://www.bseindia.com/corporates/**"
+              ],
+              "maxCrawlDepth": 2,
+              "maxCrawlPages": 150,
+              "proxyConfiguration": {
+                "useApifyProxy": true
+              },
+              "saveMarkdown": true,
+              "startUrls": [
+                {
+                  "url": "https://www.bseindia.com/corporates/ann.html"
+                }
+              ]
+            },
+            "fieldMappings": {},
+            "watchFields": [
+              "announcementType",
+              "company",
+              "date"
+            ],
+            "runFrequencyCron": "0 20 * * *",
+            "targetOrganizationId": null,
+            "targetPersonId": null,
+            "createdBy": null,
+            "isActive": false,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-05-10T12:05:02.000Z",
+            "updatedAt": "2026-05-10T12:05:02.000Z"
+          },
+          {
+            "id": "228b101e-caf6-48eb-af59-c9204b657061",
+            "name": "sebi_orders",
+            "description": "Securities and Exchange Board of India — orders and circulars. Adjudication orders, settlement orders, sectoral circulars.",
+            "capability": "monitoring",
+            "targetType": "release",
+            "actorId": "apify/website-content-crawler",
+            "actorTaskId": null,
+            "defaultInput": {
+              "crawlerType": "playwright:adaptive",
+              "excludeUrlGlobs": [
+                "https://www.sebi.gov.in/sebiweb/**/_files/*"
+              ],
+              "htmlTransformer": "readableTextIfPossible",
+              "includeUrlGlobs": [
+                "https://www.sebi.gov.in/enforcement/**",
+                "https://www.sebi.gov.in/legal/**"
+              ],
+              "maxCrawlDepth": 2,
+              "maxCrawlPages": 200,
+              "proxyConfiguration": {
+                "useApifyProxy": true
+              },
+              "saveMarkdown": true,
+              "startUrls": [
+                {
+                  "url": "https://www.sebi.gov.in/sebiweb/home/HomeAction.do?doListing=yes&sid=1&ssid=6&smid=0"
+                },
+                {
+                  "url": "https://www.sebi.gov.in/sebiweb/home/HomeAction.do?doListing=yes&sid=1&ssid=7&smid=0"
+                }
+              ]
+            },
+            "fieldMappings": {},
+            "watchFields": [
+              "orderTitle",
+              "respondent",
+              "orderDate"
+            ],
+            "runFrequencyCron": "0 4 * * *",
+            "targetOrganizationId": null,
+            "targetPersonId": null,
+            "createdBy": null,
+            "isActive": false,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-05-10T12:05:02.000Z",
+            "updatedAt": "2026-05-10T12:05:02.000Z"
+          },
+          {
+            "id": "6551fbbb-38a9-47ca-aaa3-643e071084cd",
+            "name": "pib_releases",
+            "description": "Press Information Bureau — Government of India press releases. Cabinet appointments, ministry-level changes, regulatory transitions.",
+            "capability": "monitoring",
+            "targetType": "release",
+            "actorId": "apify/website-content-crawler",
+            "actorTaskId": null,
+            "defaultInput": {
+              "crawlerType": "playwright:adaptive",
+              "excludeUrlGlobs": [
+                "https://pib.gov.in/Allarchive*",
+                "https://pib.gov.in/IndexEng.aspx*"
+              ],
+              "htmlTransformer": "readableTextIfPossible",
+              "includeUrlGlobs": [
+                "https://pib.gov.in/PressReleasePage.aspx*",
+                "https://pib.gov.in/PressReleseDetail.aspx*"
+              ],
+              "maxCrawlDepth": 2,
+              "maxCrawlPages": 300,
+              "proxyConfiguration": {
+                "useApifyProxy": true
+              },
+              "saveMarkdown": true,
+              "startUrls": [
+                {
+                  "url": "https://pib.gov.in/PressReleasePage.aspx"
+                }
+              ]
+            },
+            "fieldMappings": {},
+            "watchFields": [
+              "title",
+              "publishedAt",
+              "ministry",
+              "url"
+            ],
+            "runFrequencyCron": "0 */6 * * *",
+            "targetOrganizationId": null,
+            "targetPersonId": null,
+            "createdBy": null,
+            "isActive": false,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-05-10T12:05:01.000Z",
+            "updatedAt": "2026-05-10T12:05:01.000Z"
+          },
+          {
+            "id": "ab51e3a5-e41d-4962-9f17-f73af279122a",
+            "name": "mca21_filings",
+            "description": "Ministry of Corporate Affairs — corporate filings index. Director changes, board reshuffles, company status updates.",
+            "capability": "monitoring",
+            "targetType": "filing",
+            "actorId": "apify/website-content-crawler",
+            "actorTaskId": null,
+            "defaultInput": {
+              "crawlerType": "playwright:adaptive",
+              "excludeUrlGlobs": [
+                "https://www.mca.gov.in/**/Old/**",
+                "https://www.mca.gov.in/**/_files/*",
+                "https://www.mca.gov.in/**/notices/**"
+              ],
+              "htmlTransformer": "readableTextIfPossible",
+              "includeUrlGlobs": [
+                "https://www.mca.gov.in/**"
+              ],
+              "maxCrawlDepth": 2,
+              "maxCrawlPages": 150,
+              "proxyConfiguration": {
+                "useApifyProxy": true
+              },
+              "saveMarkdown": true,
+              "startUrls": [
+                {
+                  "url": "https://www.mca.gov.in/MinistryV2/companyformsdownload.html"
+                }
+              ]
+            },
+            "fieldMappings": {},
+            "watchFields": [
+              "companyName",
+              "filingType",
+              "filingDate"
+            ],
+            "runFrequencyCron": "0 2 * * *",
+            "targetOrganizationId": null,
+            "targetPersonId": null,
+            "createdBy": null,
+            "isActive": false,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-05-10T12:05:01.000Z",
+            "updatedAt": "2026-05-10T12:05:01.000Z"
+          },
+          {
+            "id": "915ccd3e-ec04-4828-942d-293a376595ad",
+            "name": "rbi_press_releases",
+            "description": "Reserve Bank of India — press releases. New leadership appointments, regulatory orders, sectoral directives.",
+            "capability": "monitoring",
+            "targetType": "release",
+            "actorId": "apify/website-content-crawler",
+            "actorTaskId": null,
+            "defaultInput": {
+              "crawlerType": "playwright:adaptive",
+              "excludeUrlGlobs": [
+                "https://www.rbi.org.in/**/Archive*",
+                "https://www.rbi.org.in/**/_files/*"
+              ],
+              "htmlTransformer": "readableTextIfPossible",
+              "includeUrlGlobs": [
+                "https://www.rbi.org.in/Scripts/BS_PressReleaseDisplay.aspx?prid=*"
+              ],
+              "maxCrawlDepth": 2,
+              "maxCrawlPages": 200,
+              "proxyConfiguration": {
+                "useApifyProxy": true
+              },
+              "saveHtml": false,
+              "saveMarkdown": true,
+              "startUrls": [
+                {
+                  "url": "https://www.rbi.org.in/Scripts/BS_PressReleaseDisplay.aspx"
+                }
+              ]
+            },
+            "fieldMappings": {},
+            "watchFields": [
+              "title",
+              "publishedAt",
+              "url"
+            ],
+            "runFrequencyCron": "0 */6 * * *",
+            "targetOrganizationId": null,
+            "targetPersonId": null,
+            "createdBy": null,
+            "isActive": false,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-05-10T12:05:00.000Z",
+            "updatedAt": "2026-05-10T12:05:00.000Z"
+          },
+          {
+            "id": "aa5cd40d-20af-4005-8303-29998d88f378",
+            "name": "Nainital Bank leadership monitor",
+            "description": "Monitor official leadership updates for Nainital Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.nainitalbank.co.in",
+              "search": "Nainital Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "9eb8f8d0-f187-406d-9810-734069a1c0b9",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:05.000Z",
+            "updatedAt": "2026-04-06T13:31:05.000Z"
+          },
+          {
+            "id": "3d1d7ebd-49f0-4f88-a96c-ed878f86d179",
+            "name": "Karur Vysya Bank leadership monitor",
+            "description": "Monitor official leadership updates for Karur Vysya Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.kvb.co.in",
+              "search": "Karur Vysya Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "9bb078a9-a021-48a4-9029-147d6b7ae391",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:05.000Z",
+            "updatedAt": "2026-04-06T13:31:05.000Z"
+          },
+          {
+            "id": "8e9eb33b-3af3-4c2c-a55d-fa1b0460161c",
+            "name": "Dhanlaxmi Bank leadership monitor",
+            "description": "Monitor official leadership updates for Dhanlaxmi Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.dhanbank.com",
+              "search": "Dhanlaxmi Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "0a4e8fe9-dc8b-4890-ba36-fd11a0d705f5",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:05.000Z",
+            "updatedAt": "2026-04-06T13:31:05.000Z"
+          },
+          {
+            "id": "839d4ed8-56cd-439e-942e-aa90d7282182",
+            "name": "Tamilnad Mercantile Bank leadership monitor",
+            "description": "Monitor official leadership updates for Tamilnad Mercantile Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.tmbnet.in",
+              "search": "Tamilnad Mercantile Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "ea704757-6562-4f4b-8903-9f8c0b428d36",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:05.000Z",
+            "updatedAt": "2026-04-06T13:31:05.000Z"
+          },
+          {
+            "id": "2a885920-22b2-4b26-8425-28ea28244adb",
+            "name": "CSB Bank leadership monitor",
+            "description": "Monitor official leadership updates for CSB Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.csb.co.in",
+              "search": "CSB Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "82d97863-1205-4e06-9d6e-84bd148124fd",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:04.000Z",
+            "updatedAt": "2026-04-06T13:31:04.000Z"
+          },
+          {
+            "id": "20877389-f520-475f-b4af-989ba16a876d",
+            "name": "City Union Bank leadership monitor",
+            "description": "Monitor official leadership updates for City Union Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.cityunionbank.com",
+              "search": "City Union Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "0de9d129-fc75-40ea-84f4-317b19bdb1e8",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:04.000Z",
+            "updatedAt": "2026-04-06T13:31:04.000Z"
+          },
+          {
+            "id": "8d34ab29-2dd2-497d-bd7f-e0cd5809f547",
+            "name": "Karnataka Bank leadership monitor",
+            "description": "Monitor official leadership updates for Karnataka Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://karnatakabank.com",
+              "search": "Karnataka Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "89bd9d83-cb60-4bba-84fd-cbe08b6e4866",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:04.000Z",
+            "updatedAt": "2026-04-06T13:31:04.000Z"
+          },
+          {
+            "id": "611fbb0c-bade-4833-b3fa-4989c4849b53",
+            "name": "DCB Bank leadership monitor",
+            "description": "Monitor official leadership updates for DCB Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.dcbbank.com",
+              "search": "DCB Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "ffc770d3-2e5f-4a7d-b08f-5803812ae5ea",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:04.000Z",
+            "updatedAt": "2026-04-06T13:31:04.000Z"
+          },
+          {
+            "id": "1db37ddb-34db-46cf-ab9f-ea010af2a775",
+            "name": "South Indian Bank leadership monitor",
+            "description": "Monitor official leadership updates for South Indian Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.southindianbank.com",
+              "search": "South Indian Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "03598969-bd19-41fd-b1bb-f7d5f621f338",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:03.000Z",
+            "updatedAt": "2026-04-06T13:31:03.000Z"
+          },
+          {
+            "id": "187b55d3-ecb8-4389-a470-d006aa7cb34d",
+            "name": "Bandhan Bank leadership monitor",
+            "description": "Monitor official leadership updates for Bandhan Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://bandhanbank.com",
+              "search": "Bandhan Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "c41ccda2-da90-448f-86e4-2df141f25b57",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:03.000Z",
+            "updatedAt": "2026-04-06T13:31:03.000Z"
+          },
+          {
+            "id": "0f92bf57-3ca5-4f30-8ca9-b66acbe376c2",
+            "name": "Federal Bank leadership monitor",
+            "description": "Monitor official leadership updates for Federal Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.federalbank.co.in",
+              "search": "Federal Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "4d858684-90e3-4e66-96b1-de76a268c698",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:03.000Z",
+            "updatedAt": "2026-04-06T13:31:03.000Z"
+          },
+          {
+            "id": "6b39925d-c680-4411-9049-6525c0c81b66",
+            "name": "RBL Bank leadership monitor",
+            "description": "Monitor official leadership updates for RBL Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.rblbank.com",
+              "search": "RBL Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "59be30ef-d4ae-4441-9b67-563775cd12c4",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:03.000Z",
+            "updatedAt": "2026-04-06T13:31:03.000Z"
+          },
+          {
+            "id": "343e1f2a-048b-46b5-a083-5c99045a40fd",
+            "name": "Kotak Mahindra Bank leadership monitor",
+            "description": "Monitor official leadership updates for Kotak Mahindra Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.kotak.com",
+              "search": "Kotak Mahindra Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "e133b28e-a3b9-4609-8219-46d96b149230",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:02.000Z",
+            "updatedAt": "2026-04-06T13:31:02.000Z"
+          },
+          {
+            "id": "03f13741-da69-4a57-9c27-3bd64cb87e68",
+            "name": "IDFC FIRST Bank leadership monitor",
+            "description": "Monitor official leadership updates for IDFC FIRST Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.idfcfirstbank.com",
+              "search": "IDFC FIRST Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "b8cc8e5e-8c32-4640-b689-b1f3fd00df8a",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:02.000Z",
+            "updatedAt": "2026-04-06T13:31:02.000Z"
+          },
+          {
+            "id": "94a1375d-2df1-4df6-9ec2-d62538ce24e1",
+            "name": "Yes Bank leadership monitor",
+            "description": "Monitor official leadership updates for Yes Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.yesbank.in",
+              "search": "Yes Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "681d1e5f-7cc0-4b6e-af49-2777d830515a",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:02.000Z",
+            "updatedAt": "2026-04-06T13:31:02.000Z"
+          },
+          {
+            "id": "d8d9ee48-f852-416c-ad35-d21aed114cb2",
+            "name": "IndusInd Bank leadership monitor",
+            "description": "Monitor official leadership updates for IndusInd Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.indusind.com",
+              "search": "IndusInd Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "85210543-1bab-48d0-a03e-9857e07524b8",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:02.000Z",
+            "updatedAt": "2026-04-06T13:31:02.000Z"
+          },
+          {
+            "id": "ad5416cd-29c5-4896-9d6a-b385a9aa6558",
+            "name": "HDFC Bank leadership monitor",
+            "description": "Monitor official leadership updates for HDFC Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.hdfcbank.com",
+              "search": "HDFC Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "4fa60f2c-35ea-46a3-82aa-f2061799ca07",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:01.000Z",
+            "updatedAt": "2026-04-06T13:31:01.000Z"
+          },
+          {
+            "id": "e7d45557-7004-4b98-85bf-7dd48ee4cad3",
+            "name": "Punjab & Sind Bank leadership monitor",
+            "description": "Monitor official leadership updates for Punjab & Sind Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://punjabandsindbank.co.in",
+              "search": "Punjab & Sind Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "317e999a-5556-44d7-ab73-8910e40a91f2",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:01.000Z",
+            "updatedAt": "2026-04-06T13:31:01.000Z"
+          },
+          {
+            "id": "70784c59-e7cc-4108-a34e-b8f0f0c6f490",
+            "name": "Bank of Maharashtra leadership monitor",
+            "description": "Monitor official leadership updates for Bank of Maharashtra",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://bankofmaharashtra.in",
+              "search": "Bank of Maharashtra chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "fb3044f2-6b66-42f0-89d7-2cfd1034b397",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:01.000Z",
+            "updatedAt": "2026-04-06T13:31:01.000Z"
+          },
+          {
+            "id": "bf558931-45d3-4570-b217-9bd19249571d",
+            "name": "Axis Bank leadership monitor",
+            "description": "Monitor official leadership updates for Axis Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.axisbank.com",
+              "search": "Axis Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "77b805f8-096f-4bcc-a343-bdc2be3c982d",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:01.000Z",
+            "updatedAt": "2026-04-06T13:31:01.000Z"
+          },
+          {
+            "id": "ac97c26b-4406-401d-88aa-c793abe90948",
+            "name": "ICICI Bank leadership monitor",
+            "description": "Monitor official leadership updates for ICICI Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.icicibank.com",
+              "search": "ICICI Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "33a7b675-1b42-4231-b9c5-feea8b5cd404",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:01.000Z",
+            "updatedAt": "2026-04-06T13:31:01.000Z"
+          },
+          {
+            "id": "59d41571-dc1c-4ac0-a932-f782c4732145",
+            "name": "Central Bank of India leadership monitor",
+            "description": "Monitor official leadership updates for Central Bank of India",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.centralbankofindia.co.in",
+              "search": "Central Bank of India chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "8ae31290-8a6f-45f8-bae2-d3d4d8bde131",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:00.000Z",
+            "updatedAt": "2026-04-06T13:31:00.000Z"
+          },
+          {
+            "id": "00b9d6d1-05df-4d24-ada6-e59b7e0e2c02",
+            "name": "Indian Overseas Bank leadership monitor",
+            "description": "Monitor official leadership updates for Indian Overseas Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.iob.in",
+              "search": "Indian Overseas Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "74e647ca-9ca2-4af4-a3d2-61a026761015",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:00.000Z",
+            "updatedAt": "2026-04-06T13:31:00.000Z"
+          },
+          {
+            "id": "d9ad542c-77ca-4364-8a7a-eb6b1cb6ee1a",
+            "name": "Bank of India leadership monitor",
+            "description": "Monitor official leadership updates for Bank of India",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://bankofindia.co.in",
+              "search": "Bank of India chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "3853af90-5d19-42f7-a543-4c6a4bd6c354",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:00.000Z",
+            "updatedAt": "2026-04-06T13:31:00.000Z"
+          },
+          {
+            "id": "e5f8b215-78c8-4062-80ac-948fa06e403f",
+            "name": "UCO Bank leadership monitor",
+            "description": "Monitor official leadership updates for UCO Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.ucobank.com",
+              "search": "UCO Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "228747d7-5e7a-4e96-a0f5-4a21b7c8363c",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:31:00.000Z",
+            "updatedAt": "2026-04-06T13:31:00.000Z"
+          },
+          {
+            "id": "b8af821c-4d91-4842-b9f3-d01a0d22f8bc",
+            "name": "Canara Bank leadership monitor",
+            "description": "Monitor official leadership updates for Canara Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://canarabank.com",
+              "search": "Canara Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "7732b095-0df5-4e00-b49a-e5fcb000d26f",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:30:59.000Z",
+            "updatedAt": "2026-04-06T13:30:59.000Z"
+          },
+          {
+            "id": "c36b1544-56ff-4c63-be14-e74e0d4e6d9e",
+            "name": "Punjab National Bank leadership monitor",
+            "description": "Monitor official leadership updates for Punjab National Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.pnbindia.in",
+              "search": "Punjab National Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "6beef244-20bd-42fb-9977-a065753ed0f5",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:30:59.000Z",
+            "updatedAt": "2026-04-06T13:30:59.000Z"
+          },
+          {
+            "id": "aae4b701-df02-42c4-b634-8b04b401c480",
+            "name": "Union Bank of India leadership monitor",
+            "description": "Monitor official leadership updates for Union Bank of India",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.unionbankofindia.co.in",
+              "search": "Union Bank of India chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "27f4470e-b622-414c-80d9-b830f54054b7",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:30:59.000Z",
+            "updatedAt": "2026-04-06T13:30:59.000Z"
+          },
+          {
+            "id": "9f27ee6c-b0c5-4ebd-8b82-64a25e8360af",
+            "name": "Indian Bank leadership monitor",
+            "description": "Monitor official leadership updates for Indian Bank",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.indianbank.in",
+              "search": "Indian Bank chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "715ad1a8-c8f5-42d5-8210-9c93be2d4644",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:30:59.000Z",
+            "updatedAt": "2026-04-06T13:30:59.000Z"
+          },
+          {
+            "id": "2d8563be-ff80-4f34-ae74-b15ac87a0713",
+            "name": "Bank of Baroda leadership monitor",
+            "description": "Monitor official leadership updates for Bank of Baroda",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://www.bankofbaroda.in",
+              "search": "Bank of Baroda chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "f9630340-011a-48f9-97db-940c0699666a",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:30:58.000Z",
+            "updatedAt": "2026-04-06T13:30:58.000Z"
+          },
+          {
+            "id": "65301e81-9c9b-4098-91a1-5f1e001f6818",
+            "name": "State Bank of India leadership monitor",
+            "description": "Monitor official leadership updates for State Bank of India",
+            "capability": "monitoring",
+            "targetType": "organization",
+            "actorId": null,
+            "actorTaskId": null,
+            "defaultInput": {
+              "bankWebsite": "https://sbi.co.in",
+              "search": "State Bank of India chairman managing director executive director official leadership"
+            },
+            "fieldMappings": {
+              "name": "name",
+              "organization": "organizationName",
+              "sourceUrl": "url",
+              "title": "title"
+            },
+            "watchFields": [
+              "title",
+              "organizationName",
+              "url"
+            ],
+            "runFrequencyCron": "0 0 * * 1",
+            "targetOrganizationId": "50754039-1e2c-401a-be7e-0e4cef0fe506",
+            "targetPersonId": null,
+            "createdBy": 30001,
+            "isActive": true,
+            "lastRunAt": null,
+            "lastRunStatus": null,
+            "lastRunSummary": null,
+            "createdAt": "2026-04-06T13:30:58.000Z",
+            "updatedAt": "2026-04-06T13:30:58.000Z"
+          }
+        ],
+        "total": 38,
+        "page": 1,
+        "pageSize": 50,
+        "totalPages": 1
+      }
+    },
+    "bankTargets": {
+      "status": 200,
+      "data": [
+        {
+          "name": "State Bank of India",
+          "type": "psu_bank",
+          "website": "https://sbi.co.in",
+          "regulatorGroup": "public_sector_bank",
+          "sectorLabel": "Public sector",
+          "organizationExists": true,
+          "organizationId": "50754039-1e2c-401a-be7e-0e4cef0fe506",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "Bank of Baroda",
+          "type": "psu_bank",
+          "website": "https://www.bankofbaroda.in",
+          "regulatorGroup": "public_sector_bank",
+          "sectorLabel": "Public sector",
+          "organizationExists": true,
+          "organizationId": "f9630340-011a-48f9-97db-940c0699666a",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "Punjab National Bank",
+          "type": "psu_bank",
+          "website": "https://www.pnbindia.in",
+          "regulatorGroup": "public_sector_bank",
+          "sectorLabel": "Public sector",
+          "organizationExists": true,
+          "organizationId": "6beef244-20bd-42fb-9977-a065753ed0f5",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "Canara Bank",
+          "type": "psu_bank",
+          "website": "https://canarabank.com",
+          "regulatorGroup": "public_sector_bank",
+          "sectorLabel": "Public sector",
+          "organizationExists": true,
+          "organizationId": "7732b095-0df5-4e00-b49a-e5fcb000d26f",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "Union Bank of India",
+          "type": "psu_bank",
+          "website": "https://www.unionbankofindia.co.in",
+          "regulatorGroup": "public_sector_bank",
+          "sectorLabel": "Public sector",
+          "organizationExists": true,
+          "organizationId": "27f4470e-b622-414c-80d9-b830f54054b7",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "Indian Bank",
+          "type": "psu_bank",
+          "website": "https://www.indianbank.in",
+          "regulatorGroup": "public_sector_bank",
+          "sectorLabel": "Public sector",
+          "organizationExists": true,
+          "organizationId": "715ad1a8-c8f5-42d5-8210-9c93be2d4644",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "Bank of India",
+          "type": "psu_bank",
+          "website": "https://bankofindia.co.in",
+          "regulatorGroup": "public_sector_bank",
+          "sectorLabel": "Public sector",
+          "organizationExists": true,
+          "organizationId": "3853af90-5d19-42f7-a543-4c6a4bd6c354",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "Central Bank of India",
+          "type": "psu_bank",
+          "website": "https://www.centralbankofindia.co.in",
+          "regulatorGroup": "public_sector_bank",
+          "sectorLabel": "Public sector",
+          "organizationExists": true,
+          "organizationId": "8ae31290-8a6f-45f8-bae2-d3d4d8bde131",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "Indian Overseas Bank",
+          "type": "psu_bank",
+          "website": "https://www.iob.in",
+          "regulatorGroup": "public_sector_bank",
+          "sectorLabel": "Public sector",
+          "organizationExists": true,
+          "organizationId": "74e647ca-9ca2-4af4-a3d2-61a026761015",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "UCO Bank",
+          "type": "psu_bank",
+          "website": "https://www.ucobank.com",
+          "regulatorGroup": "public_sector_bank",
+          "sectorLabel": "Public sector",
+          "organizationExists": true,
+          "organizationId": "228747d7-5e7a-4e96-a0f5-4a21b7c8363c",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "Bank of Maharashtra",
+          "type": "psu_bank",
+          "website": "https://bankofmaharashtra.in",
+          "regulatorGroup": "public_sector_bank",
+          "sectorLabel": "Public sector",
+          "organizationExists": true,
+          "organizationId": "fb3044f2-6b66-42f0-89d7-2cfd1034b397",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "Punjab & Sind Bank",
+          "type": "psu_bank",
+          "website": "https://punjabandsindbank.co.in",
+          "regulatorGroup": "public_sector_bank",
+          "sectorLabel": "Public sector",
+          "organizationExists": true,
+          "organizationId": "317e999a-5556-44d7-ab73-8910e40a91f2",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "HDFC Bank",
+          "type": "private_bank",
+          "website": "https://www.hdfcbank.com",
+          "regulatorGroup": "private_sector_bank",
+          "sectorLabel": "Private sector",
+          "organizationExists": true,
+          "organizationId": "4fa60f2c-35ea-46a3-82aa-f2061799ca07",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "ICICI Bank",
+          "type": "private_bank",
+          "website": "https://www.icicibank.com",
+          "regulatorGroup": "private_sector_bank",
+          "sectorLabel": "Private sector",
+          "organizationExists": true,
+          "organizationId": "33a7b675-1b42-4231-b9c5-feea8b5cd404",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "Axis Bank",
+          "type": "private_bank",
+          "website": "https://www.axisbank.com",
+          "regulatorGroup": "private_sector_bank",
+          "sectorLabel": "Private sector",
+          "organizationExists": true,
+          "organizationId": "77b805f8-096f-4bcc-a343-bdc2be3c982d",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "Kotak Mahindra Bank",
+          "type": "private_bank",
+          "website": "https://www.kotak.com",
+          "regulatorGroup": "private_sector_bank",
+          "sectorLabel": "Private sector",
+          "organizationExists": true,
+          "organizationId": "e133b28e-a3b9-4609-8219-46d96b149230",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "IndusInd Bank",
+          "type": "private_bank",
+          "website": "https://www.indusind.com",
+          "regulatorGroup": "private_sector_bank",
+          "sectorLabel": "Private sector",
+          "organizationExists": true,
+          "organizationId": "85210543-1bab-48d0-a03e-9857e07524b8",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "Yes Bank",
+          "type": "private_bank",
+          "website": "https://www.yesbank.in",
+          "regulatorGroup": "private_sector_bank",
+          "sectorLabel": "Private sector",
+          "organizationExists": true,
+          "organizationId": "681d1e5f-7cc0-4b6e-af49-2777d830515a",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "IDFC FIRST Bank",
+          "type": "private_bank",
+          "website": "https://www.idfcfirstbank.com",
+          "regulatorGroup": "private_sector_bank",
+          "sectorLabel": "Private sector",
+          "organizationExists": true,
+          "organizationId": "b8cc8e5e-8c32-4640-b689-b1f3fd00df8a",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "Federal Bank",
+          "type": "private_bank",
+          "website": "https://www.federalbank.co.in",
+          "regulatorGroup": "private_sector_bank",
+          "sectorLabel": "Private sector",
+          "organizationExists": true,
+          "organizationId": "4d858684-90e3-4e66-96b1-de76a268c698",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "South Indian Bank",
+          "type": "private_bank",
+          "website": "https://www.southindianbank.com",
+          "regulatorGroup": "private_sector_bank",
+          "sectorLabel": "Private sector",
+          "organizationExists": true,
+          "organizationId": "03598969-bd19-41fd-b1bb-f7d5f621f338",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "RBL Bank",
+          "type": "private_bank",
+          "website": "https://www.rblbank.com",
+          "regulatorGroup": "private_sector_bank",
+          "sectorLabel": "Private sector",
+          "organizationExists": true,
+          "organizationId": "59be30ef-d4ae-4441-9b67-563775cd12c4",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "Bandhan Bank",
+          "type": "private_bank",
+          "website": "https://bandhanbank.com",
+          "regulatorGroup": "private_sector_bank",
+          "sectorLabel": "Private sector",
+          "organizationExists": true,
+          "organizationId": "c41ccda2-da90-448f-86e4-2df141f25b57",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "CSB Bank",
+          "type": "private_bank",
+          "website": "https://www.csb.co.in",
+          "regulatorGroup": "private_sector_bank",
+          "sectorLabel": "Private sector",
+          "organizationExists": true,
+          "organizationId": "82d97863-1205-4e06-9d6e-84bd148124fd",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "City Union Bank",
+          "type": "private_bank",
+          "website": "https://www.cityunionbank.com",
+          "regulatorGroup": "private_sector_bank",
+          "sectorLabel": "Private sector",
+          "organizationExists": true,
+          "organizationId": "0de9d129-fc75-40ea-84f4-317b19bdb1e8",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "DCB Bank",
+          "type": "private_bank",
+          "website": "https://www.dcbbank.com",
+          "regulatorGroup": "private_sector_bank",
+          "sectorLabel": "Private sector",
+          "organizationExists": true,
+          "organizationId": "ffc770d3-2e5f-4a7d-b08f-5803812ae5ea",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "Karnataka Bank",
+          "type": "private_bank",
+          "website": "https://karnatakabank.com",
+          "regulatorGroup": "private_sector_bank",
+          "sectorLabel": "Private sector",
+          "organizationExists": true,
+          "organizationId": "89bd9d83-cb60-4bba-84fd-cbe08b6e4866",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "Karur Vysya Bank",
+          "type": "private_bank",
+          "website": "https://www.kvb.co.in",
+          "regulatorGroup": "private_sector_bank",
+          "sectorLabel": "Private sector",
+          "organizationExists": true,
+          "organizationId": "9bb078a9-a021-48a4-9029-147d6b7ae391",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "Tamilnad Mercantile Bank",
+          "type": "private_bank",
+          "website": "https://www.tmbnet.in",
+          "regulatorGroup": "private_sector_bank",
+          "sectorLabel": "Private sector",
+          "organizationExists": true,
+          "organizationId": "ea704757-6562-4f4b-8903-9f8c0b428d36",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "Dhanlaxmi Bank",
+          "type": "private_bank",
+          "website": "https://www.dhanbank.com",
+          "regulatorGroup": "private_sector_bank",
+          "sectorLabel": "Private sector",
+          "organizationExists": true,
+          "organizationId": "0a4e8fe9-dc8b-4890-ba36-fd11a0d705f5",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        },
+        {
+          "name": "Nainital Bank",
+          "type": "private_bank",
+          "website": "https://www.nainitalbank.co.in",
+          "regulatorGroup": "private_sector_bank",
+          "sectorLabel": "Private sector",
+          "organizationExists": true,
+          "organizationId": "9eb8f8d0-f187-406d-9810-734069a1c0b9",
+          "suggestedDomainId": "aa4d881f-88e1-4072-8fb8-3d6a455f6fe4"
+        }
+      ]
+    },
+    "todayFeed": {
+      "status": 200,
+      "data": []
+    },
+    "watchesList": {
+      "status": 200,
+      "data": []
+    },
+    "opportunitiesList": {
+      "status": 200,
+      "data": {
+        "data": [],
+        "total": 0,
+        "page": 1,
+        "pageSize": 100,
+        "totalPages": 1
+      }
+    },
+    "todayClassify": {
+      "status": 200,
+      "data": {
+        "tool": "coverageGap",
+        "args": {
+          "sector": "private banks"
+        },
+        "confidence": 0.95,
+        "rationale": "User is explicitly asking about coverage gaps in a sector."
+      }
+    },
+    "todayCommand": {
+      "status": 200,
+      "data": {
+        "intent": {
+          "tool": "coverageGap",
+          "args": {
+            "sector": "private banks"
+          },
+          "confidence": 0.95,
+          "rationale": "User is asking about coverage gaps in a specific sector (private banks)."
+        },
+        "result": {
+          "kind": "gap",
+          "summary": "Full coverage in private banks (0 orgs all have at least one tracked contact).",
+          "payload": {
+            "sector": "private banks",
+            "covered": 0,
+            "gaps": []
+          }
+        }
+      }
+    },
+    "geminiToken": {
+      "status": 200,
+      "data": {
+        "token": "AIzaSyCPLwyxoS6xJL7b_Vv1qy6A3kQPWizeXXw",
+        "model": "gemini-2.5-flash-preview-native-audio-dialog",
+        "mode": "raw_key"
+      }
+    }
+  },
+  "cookieNames": [
+    "relgraph_session",
+    "relgraph_refresh"
+  ]
+}

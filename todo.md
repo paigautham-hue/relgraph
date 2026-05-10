@@ -81,4 +81,11 @@
 - [ ] Populate the Indian bank leadership validation queue with source-backed ingestion so reviewed records can move beyond seeded organizations
 - [ ] Re-check related admin data flows for any remaining regressions uncovered while closing the above gaps
 - [x] Normalize the Indian Bank Dataset segment labels so the registry consistently shows Public sector and Private sector instead of legacy bank-type labels
-- [ ] Sync the latest changes from the connected GitHub repository into the RelGraph project and verify whether any conflicts or follow-up fixes are needed
+- [x] Sync the latest changes from the connected GitHub repository into the RelGraph project and verify whether any conflicts or follow-up fixes are needed
+- [x] Run a targeted QA pass on the synced preview environment covering boot logs, admin routes, the Today page layout, Watches and Opportunities routes, the VoiceBot entry point, and the command-box flow
+- [x] Verify the synced runtime boot signals for Apify source seeds, agent registry sync, and the agent runner startup in the current preview environment
+- [ ] Create a stability checkpoint after the targeted QA pass and report any route-level or console errors verbatim
+- [x] Fix the missing agent_registry boot-time persistence path so agent schedule and registry routes load in the synced preview environment
+- [x] Fix the Apify source seed boot-time insert mismatch so the 7 institutional source configs can be created with valid field_mappings data
+- [x] Fix the Today command-box classification runtime by wiring the required Anthropic secret into the web app runtime
+- [x] Fix the VoiceBot Gemini token runtime by wiring a valid Gemini/Google API secret into the web app runtime

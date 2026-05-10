@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE `apify_source_configs` MODIFY COLUMN `field_mappings` json NOT NULL DEFAULT (JSON_OBJECT());",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4PQbAAV1fA3eoWB.b82f445b8b71 --database k9bQtJYYunSEfNMRnkpenZ --execute ALTER TABLE `apify_source_configs` MODIFY COLUMN `field_mappings` json NOT NULL DEFAULT (JSON_OBJECT());",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1862
+}

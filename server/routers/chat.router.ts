@@ -74,7 +74,7 @@ export const chatRouter = router({
   // ── Gemini token endpoint ──────────────────────────────────────────────
 
   geminiToken: protectedProcedure.query(async () => {
-    const apiKey = process.env.GOOGLE_API_KEY;
+    const apiKey = process.env.GOOGLE_API_KEY ?? process.env.GEMINI_API_KEY;
     if (!apiKey) return { error: 'Gemini API key not configured' as const };
     return {
       token: apiKey,
