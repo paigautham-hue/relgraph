@@ -31,6 +31,7 @@ import {
   Eye,
   FileText,
   Globe,
+  HeartPulse,
   LayoutDashboard,
   LogOut,
   Mail,
@@ -61,6 +62,7 @@ const menuItems = [
 ];
 
 const adminItems = [
+  { icon: HeartPulse, label: "System Health", path: "/admin/health" },
   { icon: UserCog, label: "Users", path: "/admin/users" },
   { icon: Mail, label: "Access Requests", path: "/admin/requests" },
   { icon: Globe, label: "Domains", path: "/admin/domains" },
