@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { router, domainScopedProcedure, contributorProcedure } from "../_core/trpc";
 import { createReflectionSchema, paginationSchema } from "@shared/validation";
+import { recordEntityProvenance } from "../services/provenance-helpers";
 import { REFLECTION_CATEGORIES, VISIBILITY_LEVELS, ROLE_LEVELS, type UserRole } from "@shared/enums";
 import { getDb } from "../db";
 import { reflections, persons, users } from "../db/schema";
@@ -156,6 +157,13 @@ export const reflectionsRouter = router({
       newValue: JSON.stringify(input),
       ipAddress: getClientIp(ctx.req),
       userAgent: ctx.req.headers["user-agent"] as string,
+    });
+
+    await recordEntityProvenance({
+      entityType: "reflection",
+      entityId: reflection.id,
+      capturedBy: ctx.user.id,
+      inputMethod: input.inputMethod ?? null,
     });
 
     return reflection;

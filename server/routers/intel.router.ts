@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { router, domainScopedProcedure, contributorProcedure } from "../_core/trpc";
 import { createIntelSchema, paginationSchema } from "@shared/validation";
+import { recordEntityProvenance } from "../services/provenance-helpers";
 import { getDb } from "../db";
 import { personIntel, persons, users } from "../db/schema";
 import { eq, and, desc, asc, count } from "drizzle-orm";
@@ -120,6 +121,15 @@ export const intelRouter = router({
       newValue: JSON.stringify(input),
       ipAddress: getClientIp(ctx.req),
       userAgent: ctx.req.headers["user-agent"] as string,
+    });
+
+    await recordEntityProvenance({
+      entityType: "intel_field",
+      entityId: intel.id,
+      capturedBy: ctx.user.id,
+      inputMethod: input.inputMethod ?? null,
+      sourceUrl: input.sourceUrl ?? null,
+      sourceLabel: input.fieldName,
     });
 
     return intel;

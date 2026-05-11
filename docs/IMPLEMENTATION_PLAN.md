@@ -250,7 +250,7 @@ Each week is a coherent shippable chunk. **MAPS.md must be updated in the same c
 **Goal:** the habit forms. Today feed is alive every morning.
 
 - [x] 6.1 Digest agent: `server/services/agents/digest-dispatcher.ts` — fans out per active user; assembles cards from watches, owned relationships, opportunities, follow-ups, no-owner candidates; idempotent within 7-day window
-- [ ] 6.2 Brief agent: pre-builds tomorrow's meeting briefings *(still deferred — needs a calendar integration that RelGraph doesn't have yet. A minimal "brief from recent interactions" could ship without calendar but offers less value.)*
+- [x] 6.2 Brief agent shipped on 2026-05-11 — a minimal version that briefs from last 7 days of interactions + active opportunities + stale relationships + recent power-moves (calendar version still blocked on absent calendar integration, but the no-calendar variant covers most of the value).
 - [x] 6.3 Change-detection agent shipped in commit `9bad531` (week 2 follow-on). Heuristic rules emit `role_change` / `board_appointment` / `regulatory_action` power_moves. LLM-based extraction from raw scraped Markdown is the next polish step but heuristics work today.
 - [x] 6.4 Path-recompute agent shipped in commit `82bd400` (final phase). Event-driven: new current tenures within 2h emit `new_path` digest cards for watchers.
 - [x] 6.5 Trust-auditor agent: `server/services/agents/trust-auditor-dispatcher.ts` — weekly decay of past-expiry provenance, verified entries exempt
@@ -295,11 +295,11 @@ Honest status. Anything not listed here is shipped.
 
 ### Genuinely deferred (could ship; partial value without external dep)
 
-1. **Brief agent** (item 6.2) — pre-build tomorrow's meeting briefings. Originally specced against calendar integration. A minimal version against `interactions` (most recently logged + opportunity-linked) could ship today and would generate `briefing` digest cards. Lower ceiling than the calendar version, but real value for users with active capture habits.
-2. **Provenance back-fill on legacy writes** — when a user creates an interaction, note, intel field, reflection, tenure, or relationship via the existing routers, no provenance row is recorded. The command-box and ingestion paths already record. Pattern is established (`recordProvenance()` helper exists, never throws). Adding one call per write site is ~30 minutes of mechanical work.
-3. **LLM-based extraction in change-detection** — current heuristic catches role changes via new tenures + regulatory keywords. The next level (extracting structured power-moves from raw scraped RBI/PIB Markdown body) is a Claude Sonnet call per ingested doc. Higher precision, real token cost.
-4. **OpportunityDetail page** — explicitly deferred ("inline cards cover 80% case"). Stage transition controls, full link management, history timeline. Useful when an opportunity has 5+ links or a complex history.
-5. **Institutional skeleton extension to BSE-200** — current seed has 54 organizations (12 PSU + 20 private banks + 5 regulators + 5 govt + 7 DFIs + 5 market infra). The plan envisioned adding top-100 BSE-200 boards. Pure data work — same seed pattern, just more rows.
+1. ~~**Brief agent**~~ — ✅ shipped 2026-05-11 (minimal version that briefs from interactions + opportunities + stale relationships + power-moves; calendar variant still deferred until calendar integration ships).
+2. ~~**Provenance back-fill on legacy writes**~~ — ✅ shipped 2026-05-11 (helper + wired into 6 routers: interactions, notes, reflections, intel, tenures, relationships).
+3. **LLM-based extraction in change-detection** — current heuristic catches role changes via new tenures + regulatory keywords. The next level (extracting structured power-moves from raw scraped RBI/PIB Markdown body) is a Claude Sonnet call per ingested doc. Higher precision, real token cost. **Your call** on when to enable.
+4. ~~**OpportunityDetail page**~~ — ✅ shipped 2026-05-11. Full stage transitions, link management, momentum, provenance, lost-with-reason flow.
+5. ~~**Institutional skeleton extension to BSE-200**~~ — ✅ shipped 2026-05-11. Added 30 top BSE-listed corporates (Reliance, TCS, Infosys, HUL, ITC, Bharti, L&T, Tata Motors, Maruti, M&M, Wipro, HCL Tech, Sun Pharma, Cipla, Nestle, Britannia, Tata Steel, JSW Steel, Hindalco, UltraTech, Grasim, Adani, PowerGrid, NTPC, ONGC, Coal India, Bajaj Auto, Hero MotoCorp, Asian Paints, Dr. Reddy's). Total skeleton 84 orgs.
 
 ### Blocked on external dependencies you control
 
@@ -321,7 +321,7 @@ Honest status. Anything not listed here is shipped.
 - Replacing the in-house cron parser with `node-cron`. Adds 50-100 KB for behaviour we already cover.
 - Native iOS Capacitor wrapper. PWA on iOS Safari is good enough; voice works there.
 
-**Net:** **#1 (Brief agent minimal) and #2 (provenance back-fill)** are the only items that would meaningfully increase user value without blocking on you. Both ship in a single focused session. Everything else is either calendar-blocked, cost-considered (LLM extraction), polish (OpportunityDetail), data-rolling (skeleton extension), or correctly skipped.
+**Net (as of 2026-05-11):** items 1, 2, 4, 5 above all shipped. Item 3 (LLM-based change-detection extraction) is the only "could-ship" item left — it's a cost decision for you, not an architectural one. **The plan is functionally complete.** Remaining items are either explicit external-dep blocks (magic-link auth, calendar-aware brief), pre-existing landmines documented in MAPS section 14, or items explicitly skipped as wrong direction (demo data).
 
 ---
 

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { router, domainScopedProcedure, contributorProcedure } from "../_core/trpc";
 import { createTenureSchema, paginationSchema } from "@shared/validation";
+import { recordEntityProvenance } from "../services/provenance-helpers";
 import { getDb } from "../db";
 import { tenures, organizations, persons } from "../db/schema";
 import { eq, and, desc, asc, count } from "drizzle-orm";
@@ -129,6 +130,15 @@ export const tenuresRouter = router({
       newValue: JSON.stringify(input),
       ipAddress: getClientIp(ctx.req),
       userAgent: ctx.req.headers["user-agent"] as string,
+    });
+
+    await recordEntityProvenance({
+      entityType: "tenure",
+      entityId: tenure.id,
+      capturedBy: ctx.user.id,
+      inputMethod: null, // tenures don't carry an inputMethod column; default manual_form
+      sourceUrl: input.sourceUrl ?? null,
+      sourceLabel: `${input.title}${input.department ? ` · ${input.department}` : ""}`,
     });
 
     return tenure;

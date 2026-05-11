@@ -20,6 +20,7 @@ import { dedupDispatcher } from "./services/agents/dedup-dispatcher";
 import { changeDetectionDispatcher } from "./services/agents/change-detection-dispatcher";
 import { pathRecomputeDispatcher } from "./services/agents/path-recompute-dispatcher";
 import { enrichmentDispatcher } from "./services/agents/enrichment-dispatcher";
+import { briefDispatcher } from "./services/agents/brief-dispatcher";
 import { syncApifySourceSeeds } from "./services/apify-source-seeds";
 
 async function startServer() {
@@ -100,6 +101,8 @@ async function startServer() {
   registerAgentDispatcher("path_recompute", pathRecomputeDispatcher);
   // Enrichment (weekly) — heuristic backfill of partial records.
   registerAgentDispatcher("enrichment", enrichmentDispatcher);
+  // Brief (daily 05:00 IST per user) — week-in-review + today's focus.
+  registerAgentDispatcher("brief", briefDispatcher);
 
   // Start the agent runner tick. Wakes every minute, finds due schedules,
   // dispatches them. See server/services/agent-runner.service.ts.

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { router, domainScopedProcedure, contributorProcedure } from "../_core/trpc";
 import { createNoteSchema, paginationSchema } from "@shared/validation";
+import { recordEntityProvenance } from "../services/provenance-helpers";
 import { VISIBILITY_LEVELS, ROLE_LEVELS, type UserRole } from "@shared/enums";
 import { getDb } from "../db";
 import { personNotes, persons, users } from "../db/schema";
@@ -132,6 +133,13 @@ export const notesRouter = router({
       newValue: JSON.stringify(input),
       ipAddress: getClientIp(ctx.req),
       userAgent: ctx.req.headers["user-agent"] as string,
+    });
+
+    await recordEntityProvenance({
+      entityType: "note",
+      entityId: note.id,
+      capturedBy: ctx.user.id,
+      inputMethod: input.inputMethod ?? null,
     });
 
     return note;

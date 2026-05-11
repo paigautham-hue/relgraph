@@ -3,6 +3,7 @@ import { router, domainScopedProcedure, contributorProcedure } from "../_core/tr
 import { createInteractionSchema, paginationSchema } from "@shared/validation";
 import { INTERACTION_TYPES } from "@shared/enums";
 import { getDb } from "../db";
+import { recordEntityProvenance } from "../services/provenance-helpers";
 import { interactions, interactionParticipants, persons } from "../db/schema";
 import { eq, and, desc, asc, count, inArray, sql } from "drizzle-orm";
 import { logAudit, getClientIp } from "../middleware/audit";
@@ -181,6 +182,14 @@ export const interactionsRouter = router({
       newValue: JSON.stringify(input),
       ipAddress: getClientIp(ctx.req),
       userAgent: ctx.req.headers["user-agent"] as string,
+    });
+
+    // Provenance back-fill: every interaction gets a source trail.
+    await recordEntityProvenance({
+      entityType: "interaction",
+      entityId: interaction.id,
+      capturedBy: ctx.user.id,
+      inputMethod: interactionData.inputMethod ?? null,
     });
 
     return interaction;

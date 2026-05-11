@@ -1,6 +1,6 @@
 /**
  * Seed runner. Currently:
- *   - Seeds the Indian Institutional Skeleton (week 2.6) — 54 organizations
+ *   - Seeds the Indian Institutional Skeleton — 84 organizations
  *     covering all PSU banks, top private banks, key regulators, MoF + DFS
  *     and other government bodies, DFIs, and market infrastructure.
  *

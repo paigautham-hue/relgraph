@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { router, domainScopedProcedure, contributorProcedure } from "../_core/trpc";
 import { createRelationshipSchema, paginationSchema } from "@shared/validation";
+import { recordEntityProvenance } from "../services/provenance-helpers";
 import { RELATIONSHIP_TYPES, STRENGTH_LABELS } from "@shared/enums";
 import { getDb } from "../db";
 import { relationships, persons } from "../db/schema";
@@ -150,6 +151,14 @@ export const relationshipsRouter = router({
         newValue: JSON.stringify(input),
         ipAddress: getClientIp(ctx.req),
         userAgent: ctx.req.headers["user-agent"] as string,
+      });
+
+      await recordEntityProvenance({
+        entityType: "relationship",
+        entityId: rel.id,
+        capturedBy: ctx.user.id,
+        inputMethod: null,
+        sourceLabel: input.type,
       });
 
       return rel;

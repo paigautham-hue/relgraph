@@ -147,8 +147,16 @@ describe("Institutional skeleton dataset", () => {
     expect(unique.size).toBe(names.length);
   });
 
-  it("totals 54 organizations as documented", () => {
-    expect(ALL_SKELETON_ORGS).toHaveLength(54);
+  it("totals 84 organizations as documented (54 financial + 30 top corporates)", () => {
+    expect(ALL_SKELETON_ORGS).toHaveLength(84);
+  });
+
+  it("top corporates include Reliance, TCS, Infosys, and Adani", () => {
+    const names = ALL_SKELETON_ORGS.map((o) => o.name);
+    expect(names).toContain("Reliance Industries Limited");
+    expect(names).toContain("Tata Consultancy Services");
+    expect(names).toContain("Infosys Limited");
+    expect(names).toContain("Adani Enterprises Limited");
   });
 });
 

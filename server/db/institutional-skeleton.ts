@@ -469,6 +469,44 @@ export const MARKET_INFRA: SkeletonOrg[] = [
   },
 ];
 
+// Major BSE-listed corporates beyond banks and DFIs. Selected by market
+// cap + systemic relevance to a senior-executive relationship-intel use case.
+// These extend the skeleton with the corporates a Manipal Group-tier user
+// most plausibly tracks. Phase 3 could push this to the full BSE-200; this
+// list of 30 covers the bulk of strategic relevance.
+export const TOP_CORPORATES: SkeletonOrg[] = [
+  { name: "Reliance Industries Limited", shortName: "Reliance", type: "corporate", city: "Mumbai", website: "https://ril.com", about: "Largest Indian company by market cap. Energy, retail, telecom (Jio)." },
+  { name: "Tata Consultancy Services", shortName: "TCS", type: "corporate", city: "Mumbai", website: "https://tcs.com" },
+  { name: "Infosys Limited", shortName: "Infosys", type: "corporate", city: "Bengaluru", website: "https://infosys.com" },
+  { name: "Hindustan Unilever Limited", shortName: "HUL", type: "corporate", city: "Mumbai", website: "https://hul.co.in" },
+  { name: "ITC Limited", shortName: "ITC", type: "corporate", city: "Kolkata", website: "https://itcportal.com", about: "Diversified — FMCG, hotels, agribusiness, paperboards." },
+  { name: "Bharti Airtel Limited", shortName: "Airtel", type: "corporate", city: "New Delhi", website: "https://airtel.in" },
+  { name: "Larsen & Toubro Limited", shortName: "L&T", type: "corporate", city: "Mumbai", website: "https://larsentoubro.com" },
+  { name: "Asian Paints Limited", shortName: "Asian Paints", type: "corporate", city: "Mumbai", website: "https://asianpaints.com" },
+  { name: "Maruti Suzuki India Limited", shortName: "Maruti", type: "corporate", city: "New Delhi", website: "https://marutisuzuki.com" },
+  { name: "Mahindra & Mahindra Limited", shortName: "M&M", type: "corporate", city: "Mumbai", website: "https://mahindra.com" },
+  { name: "Tata Motors Limited", shortName: "Tata Motors", type: "corporate", city: "Mumbai", website: "https://tatamotors.com" },
+  { name: "Bajaj Auto Limited", shortName: "Bajaj Auto", type: "corporate", city: "Pune", website: "https://bajajauto.com" },
+  { name: "Hero MotoCorp Limited", shortName: "Hero MotoCorp", type: "corporate", city: "New Delhi", website: "https://heromotocorp.com" },
+  { name: "Wipro Limited", shortName: "Wipro", type: "corporate", city: "Bengaluru", website: "https://wipro.com" },
+  { name: "HCL Technologies Limited", shortName: "HCL Tech", type: "corporate", city: "Noida", website: "https://hcltech.com" },
+  { name: "Sun Pharmaceutical Industries", shortName: "Sun Pharma", type: "corporate", city: "Mumbai", website: "https://sunpharma.com" },
+  { name: "Dr. Reddy's Laboratories", shortName: "Dr. Reddy's", type: "corporate", city: "Hyderabad", website: "https://drreddys.com" },
+  { name: "Cipla Limited", shortName: "Cipla", type: "corporate", city: "Mumbai", website: "https://cipla.com" },
+  { name: "Nestle India Limited", shortName: "Nestle India", type: "corporate", city: "Gurugram", website: "https://nestle.in" },
+  { name: "Britannia Industries Limited", shortName: "Britannia", type: "corporate", city: "Bengaluru", website: "https://britannia.co.in" },
+  { name: "Tata Steel Limited", shortName: "Tata Steel", type: "corporate", city: "Mumbai", website: "https://tatasteel.com" },
+  { name: "JSW Steel Limited", shortName: "JSW Steel", type: "corporate", city: "Mumbai", website: "https://jsw.in/steel" },
+  { name: "Hindalco Industries Limited", shortName: "Hindalco", type: "corporate", city: "Mumbai", website: "https://hindalco.com" },
+  { name: "UltraTech Cement Limited", shortName: "UltraTech", type: "corporate", city: "Mumbai", website: "https://ultratechcement.com" },
+  { name: "Grasim Industries Limited", shortName: "Grasim", type: "corporate", city: "Mumbai", website: "https://grasim.com" },
+  { name: "Adani Enterprises Limited", shortName: "Adani", type: "corporate", city: "Ahmedabad", website: "https://adani.com", about: "Diversified — energy, ports, airports, infrastructure." },
+  { name: "Power Grid Corporation of India", shortName: "PowerGrid", type: "corporate", city: "Gurugram", website: "https://powergrid.in", about: "Public sector — central transmission utility." },
+  { name: "NTPC Limited", shortName: "NTPC", type: "corporate", city: "New Delhi", website: "https://ntpc.co.in", about: "India's largest power generation company. Maharatna PSU." },
+  { name: "Oil and Natural Gas Corporation", shortName: "ONGC", type: "corporate", city: "New Delhi", website: "https://ongcindia.com" },
+  { name: "Coal India Limited", shortName: "Coal India", type: "corporate", city: "Kolkata", website: "https://coalindia.in", about: "World's largest coal producer. Maharatna PSU." },
+];
+
 export const ALL_SKELETON_ORGS: SkeletonOrg[] = [
   ...PSU_BANKS,
   ...PRIVATE_BANKS,
@@ -476,11 +514,12 @@ export const ALL_SKELETON_ORGS: SkeletonOrg[] = [
   ...GOVERNMENT,
   ...DFI_BODIES,
   ...MARKET_INFRA,
+  ...TOP_CORPORATES,
 ];
 
 /**
  * Total: 12 PSBs + 20 private banks + 5 regulators + 5 govt bodies + 7 DFIs +
- * 5 market infra = 54 organizations.
+ * 5 market infra + 30 top corporates = 84 organizations.
  *
  * The Apify-driven ingestion agents (week 2.3) will populate persons + tenures
  * on top of this skeleton. The seed is the *org backbone*; people are

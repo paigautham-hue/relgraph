@@ -146,6 +146,7 @@ function OpportunityCard({ opp }: { opp: {
   lastActivityAt: string | Date;
   isArchived: boolean;
 } }) {
+  const [, setLocation] = useLocation();
   const stage = (opp.stage as Stage) ?? "identify";
   const meta = STAGE_META[stage] ?? STAGE_META.identify;
   const Icon = meta.icon;
@@ -155,7 +156,14 @@ function OpportunityCard({ opp }: { opp: {
   })();
 
   return (
-    <Card className={`transition hover:border-primary/30 ${opp.isArchived ? "opacity-60" : ""}`}>
+    <Card
+      onClick={() => setLocation(`/opportunities/${opp.id}`)}
+      className={`cursor-pointer transition hover:border-primary/30 hover:shadow-sm ${opp.isArchived ? "opacity-60" : ""}`}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setLocation(`/opportunities/${opp.id}`); } }}
+      aria-label={`Open ${opp.name}`}
+    >
       <CardContent className="space-y-3 p-4">
         <div className="flex items-start justify-between gap-3">
           <h3 className="text-base font-semibold leading-snug">{opp.name}</h3>
