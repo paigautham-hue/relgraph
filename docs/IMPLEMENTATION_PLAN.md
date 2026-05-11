@@ -222,16 +222,16 @@ Each week is a coherent shippable chunk. **MAPS.md must be updated in the same c
 - [x] 4.1 `client/src/hooks/useVoiceRecording.ts` — owns MediaRecorder, level monitoring, retry, base64 encoding
 - [x] 4.2 `client/src/components/voice/RecordingBar.tsx` — portalled, z-9999, animated waveform, designed for light+dark
 - [x] 4.3 `client/src/components/voice/VoiceInputButton.tsx` — universal mic, drop-in for any text input
-- [ ] 4.4 `VoiceBot` floating FAB for full conversational mode via Gemini Live *(deferred — `geminiToken` + `geminiLiveEngine.ts` exist; the integrated chat-bot surface is a bigger lift)*
-- [ ] 4.5 Extend `chat.geminiToken` router with rate-limit + session lock + tools schema *(deferred with 4.4)*
-- [ ] 4.6 Convert 8 intent tools to Gemini functionDeclaration format *(deferred with 4.4)*
-- [ ] 4.7 `executeVoiceAction` server-side dispatcher *(deferred with 4.4 — note that Week 3's `command-dispatcher.service.ts` already exists and the Gemini path can call it directly)*
-- [ ] 4.8 Wire VoiceBot button into Today page as floating FAB *(deferred with 4.4)*
+- [x] 4.4 `VoiceBot` floating FAB for full conversational mode via Gemini Live — shipped in commit `82bd400` (final phase). Uses existing `geminiLiveEngine.ts` extended with custom tool injection.
+- [x] 4.5 Reused existing `chat.geminiToken` (added GOOGLE_API_KEY ↔ GEMINI_API_KEY alias in `6dba4dd` Manus QA pass). Rate-limit + session-lock retained from chat-panel use.
+- [x] 4.6 8 intent tools converted to Gemini functionDeclaration format in `client/src/lib/voiceBotTools.ts` (final phase).
+- [x] 4.7 New `today.executeVoiceIntent` procedure (final phase) routes Gemini tool calls through the Week-3 `command-dispatcher.service.ts`.
+- [x] 4.8 VoiceBot wired into Today page as floating Sparkles FAB (final phase).
 - [x] 4.9 Wire VoiceInputButton into command box (quick-capture mode = AssemblyAI). Backend: `voice.quickTranscribe` accepts base64, uploads to AssemblyAI's CDN, returns transcript synchronously.
 - [x] 4.10 MAPS.md updated with voice architecture
 - [x] 4.11 Tests: 6 new vitest cases — input contract (size cap, empty rejection), base64 round-trip preservation. Live AssemblyAI calls not tested in CI (would be flaky and cost-bearing).
 
-**Week 4 partial ship (this session):** items 4.1-4.3, 4.9-4.11 — the wedge from voice → text → command works end-to-end. Items 4.4-4.8 (full conversational Gemini Live bot) deferred to follow-on session because (a) the integrated chat surface is a bigger lift, (b) the `command-dispatcher.service.ts` from Week 3 already exposes the same 8 tools the bot would need, so the future bot can directly invoke it.
+**Week 4 — ✅ COMPLETE.** Voice transcribe wedge (items 4.1-4.3, 4.9-4.11) shipped in commit `0948735`; full conversational VoiceBot (items 4.4-4.8) shipped in commit `82bd400`.
 
 ### Week 5 — Opportunities + ownership + provenance UI ✅ SHIPPED 2026-05-08
 **Goal:** daily-use loop closes; team trust mechanics in place.
@@ -240,7 +240,7 @@ Each week is a coherent shippable chunk. **MAPS.md must be updated in the same c
 - [x] 5.2 `client/src/pages/Opportunities.tsx` with inline OpportunityCard (premature OpportunityDetail page deferred — the inline card with stuck-stage hint covers 80% case)
 - [x] 5.3 Opportunity stage state machine validated server-side via OPPORTUNITY_STAGE_TRANSITIONS map; invalid transitions return human-readable error
 - [x] 5.4 `ownership.router.ts` — assign/transfer/remove + listUnowned (powers no_owner digest card)
-- [x] 5.5 Provenance chip component — *deferred to follow-on*; the back-end + helpers ship now so any future UI can call `provenance.listForEntity`
+- [x] 5.5 ProvenanceChip component shipped in commit `82bd400` (final phase). Integrated into PersonProfile next to the name; same pattern drops into any entity surface.
 - [x] 5.6 Provenance recorded for the new write paths (logInteraction, updateOpportunity via command box). Back-fill on legacy writes (intel, notes, reflections, persons, tenures, relationships) is a follow-on per CLAUDE.md's documented incremental-rollout pattern.
 - [x] 5.7 Visibility scopes enforced in `opportunities.list` and `assertCanView/assertCanEdit` helpers — private (owner/creator only), team (domain access), org (anyone)
 - [x] 5.8 MAPS.md updated with opportunities/ownership/provenance routers, Opportunities page, dispatcher's new `updateOpportunity` real implementation
@@ -250,16 +250,16 @@ Each week is a coherent shippable chunk. **MAPS.md must be updated in the same c
 **Goal:** the habit forms. Today feed is alive every morning.
 
 - [x] 6.1 Digest agent: `server/services/agents/digest-dispatcher.ts` — fans out per active user; assembles cards from watches, owned relationships, opportunities, follow-ups, no-owner candidates; idempotent within 7-day window
-- [ ] 6.2 Brief agent: pre-builds tomorrow's meeting briefings *(deferred — needs calendar integration which RelGraph doesn't have yet)*
-- [ ] 6.3 Change-detection agent emits `power_moves` *(deferred — depends on ingestion dispatchers from Week 2.3-2.5 which need live Apify data)*
-- [ ] 6.4 Path-recompute agent on graph change *(deferred — would integrate with the existing `searchRouter.findPath`; no urgency until ingestion produces graph mutations at scale)*
+- [ ] 6.2 Brief agent: pre-builds tomorrow's meeting briefings *(still deferred — needs a calendar integration that RelGraph doesn't have yet. A minimal "brief from recent interactions" could ship without calendar but offers less value.)*
+- [x] 6.3 Change-detection agent shipped in commit `9bad531` (week 2 follow-on). Heuristic rules emit `role_change` / `board_appointment` / `regulatory_action` power_moves. LLM-based extraction from raw scraped Markdown is the next polish step but heuristics work today.
+- [x] 6.4 Path-recompute agent shipped in commit `82bd400` (final phase). Event-driven: new current tenures within 2h emit `new_path` digest cards for watchers.
 - [x] 6.5 Trust-auditor agent: `server/services/agents/trust-auditor-dispatcher.ts` — weekly decay of past-expiry provenance, verified entries exempt
 - [x] 6.6 Today feed ranking implemented in digest dispatcher per the canonical order (power_move 10 → watchlist_hit 20 → follow_up 30 → opportunity_stall 40 → opportunity_momentum 45 → stale_relationship 50 → no_owner 60 → team_intel 70 → new_path 80). Ranks gap-spaced ≥5 so future card types insert without renumbering.
 - [x] 6.7 Today UI polish — already shipped in Week 3 (designed empty/loading/error states, swipe-dismiss with optimistic mutation, light+dark designed).
 - [x] 6.8 MAPS.md updated with both new dispatchers, ranking rationale, deferred items
 - [x] 6.9 Tests: 10 new vitest cases — card rank ordering invariants (gap-spacing, relative priorities), trust-auditor decay math (1.0→0.8→0.6→0.4 floor, monotone within operating regime, verified-exempt)
 
-**Week 6 partial ship (this session):** items 6.1, 6.5, 6.6, 6.7, 6.8, 6.9. Items 6.2 (brief — calendar dep), 6.3 (change-detection — ingestion dep), 6.4 (path-recompute — value gated on ingestion volume) deferred to follow-on sessions when their external dependencies land. The activation loop is now functionally end-to-end with digest as the daily heartbeat — users will see cards every morning at 06:00 IST starting the day after first ingestion data arrives.
+**Week 6 — ✅ MOSTLY COMPLETE.** Items 6.1, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9 all shipped across commits `a78893d`, `9bad531`, `82bd400`. Item 6.2 (brief agent) remains deferred — needs a calendar integration that RelGraph doesn't have. A minimal "brief from recent interactions" version could ship without calendar but the user value is significantly lower than the calendar-aware version.
 
 ---
 
@@ -286,6 +286,42 @@ For every week:
 - `MAPS.md` updated in same commits as code
 - Commits use the format: `feat(area): description` or `fix(area): description`
 - Pushed to `main` (Manus deploys from main)
+
+---
+
+## What still remains (as of 2026-05-11)
+
+Honest status. Anything not listed here is shipped.
+
+### Genuinely deferred (could ship; partial value without external dep)
+
+1. **Brief agent** (item 6.2) — pre-build tomorrow's meeting briefings. Originally specced against calendar integration. A minimal version against `interactions` (most recently logged + opportunity-linked) could ship today and would generate `briefing` digest cards. Lower ceiling than the calendar version, but real value for users with active capture habits.
+2. **Provenance back-fill on legacy writes** — when a user creates an interaction, note, intel field, reflection, tenure, or relationship via the existing routers, no provenance row is recorded. The command-box and ingestion paths already record. Pattern is established (`recordProvenance()` helper exists, never throws). Adding one call per write site is ~30 minutes of mechanical work.
+3. **LLM-based extraction in change-detection** — current heuristic catches role changes via new tenures + regulatory keywords. The next level (extracting structured power-moves from raw scraped RBI/PIB Markdown body) is a Claude Sonnet call per ingested doc. Higher precision, real token cost.
+4. **OpportunityDetail page** — explicitly deferred ("inline cards cover 80% case"). Stage transition controls, full link management, history timeline. Useful when an opportunity has 5+ links or a complex history.
+5. **Institutional skeleton extension to BSE-200** — current seed has 54 organizations (12 PSU + 20 private banks + 5 regulators + 5 govt + 7 DFIs + 5 market infra). The plan envisioned adding top-100 BSE-200 boards. Pure data work — same seed pattern, just more rows.
+
+### Blocked on external dependencies you control
+
+6. **Magic-link auth** — needs an email API that RelGraph doesn't ship with. Until then, password flow stays. (Manus may have email infra; if so, this becomes a 1-day implementation.)
+7. **Apify ingestion enabled in production** — every source is configured but `is_active=false`. You enable each from `/admin/apify` (or `/admin/agents` → schedules) when ready. Cost guardrail intact.
+
+### Explicitly skipped (wrong direction)
+
+8. **Demo data for Watches + Opportunities** — Manus suggested seeding fake data. Declined per Rule 3 #2: empty states are deliberate teaching moments. Real users won't have demo data; they shouldn't see it either.
+
+### Pre-existing landmines documented in MAPS section 14
+
+9. `LEGACY-USERS` — int-vs-uuid users table compat shim. Pre-existing; intentional non-refactor until magic-link replaces password flow.
+10. `OWNERSHIP-CASCADE` — owner-delete behaviour. Documented; pending a hard-delete policy decision.
+11. `POLY-ORPHAN` — `opportunity_links.target_id` + `watches.target_id` can orphan if target deleted. Trust-auditor could clean these up; currently noted in code.
+
+### Won't fix (deliberate)
+
+- Replacing the in-house cron parser with `node-cron`. Adds 50-100 KB for behaviour we already cover.
+- Native iOS Capacitor wrapper. PWA on iOS Safari is good enough; voice works there.
+
+**Net:** **#1 (Brief agent minimal) and #2 (provenance back-fill)** are the only items that would meaningfully increase user value without blocking on you. Both ship in a single focused session. Everything else is either calendar-blocked, cost-considered (LLM extraction), polish (OpportunityDetail), data-rolling (skeleton extension), or correctly skipped.
 
 ---
 
