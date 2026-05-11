@@ -89,3 +89,5 @@
 - [x] Fix the Apify source seed boot-time insert mismatch so the 7 institutional source configs can be created with valid field_mappings data
 - [x] Fix the Today command-box classification runtime by wiring the required Anthropic secret into the web app runtime
 - [x] Fix the VoiceBot Gemini token runtime by wiring a valid Gemini/Google API secret into the web app runtime
+- [x] Sync the latest changes from the connected GitHub repository into the RelGraph project again and verify whether any conflicts or follow-up fixes are needed
+- [x] Create a fresh publish-ready checkpoint for the current RelGraph state so the user can publish from the UI
