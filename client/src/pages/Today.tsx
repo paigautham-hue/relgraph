@@ -15,6 +15,7 @@ import { trpc } from "@/lib/trpc";
 import { CommandBox } from "@/components/today/CommandBox";
 import { DigestCard } from "@/components/today/DigestCard";
 import { VoiceBot } from "@/components/voice/VoiceBot";
+import { DropZone } from "@/components/dropzone/DropZone";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -98,6 +99,10 @@ export default function TodayPage() {
 
       {/* Voice bot floats above the page; absent until the user taps. */}
       <VoiceBot />
+
+      {/* Drop zone — global drag listener + paste interceptor; only renders
+          when a drop/paste actually happens. */}
+      <DropZone />
     </div>
   );
 }
