@@ -91,3 +91,5 @@
 - [x] Fix the VoiceBot Gemini token runtime by wiring a valid Gemini/Google API secret into the web app runtime
 - [x] Sync the latest changes from the connected GitHub repository into the RelGraph project again and verify whether any conflicts or follow-up fixes are needed
 - [x] Create a fresh publish-ready checkpoint for the current RelGraph state so the user can publish from the UI
+- [ ] Assess whether deploying RelGraph on the connected cloud computer makes sense, inspect the remote environment, and document the setup gaps and risks
+- [ ] Pull the latest changes from the connected GitHub repository into the RelGraph project and verify whether any conflicts or follow-up fixes are needed
